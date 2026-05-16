@@ -75,6 +75,9 @@ type OutputConfig struct {
 type ClashConfig struct {
 	LocalProfileDir string `yaml:"local_profile_dir" json:"local_profile_dir"`
 	Filename        string `yaml:"filename" json:"filename"`
+	AutoRegister    bool   `yaml:"auto_register" json:"auto_register"`
+	ProfileUID      string `yaml:"profile_uid" json:"profile_uid"`
+	ProfileName     string `yaml:"profile_name" json:"profile_name"`
 	Subscription    string `yaml:"subscription_name" json:"subscription_name"`
 	Host            string `yaml:"host" json:"host"`
 	UUID            string `yaml:"uuid" json:"uuid"`
@@ -168,6 +171,12 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.Clash.Filename == "" {
 		c.Clash.Filename = "bestsub-local.yaml"
+	}
+	if c.Clash.ProfileUID == "" {
+		c.Clash.ProfileUID = "bestsub-local"
+	}
+	if c.Clash.ProfileName == "" {
+		c.Clash.ProfileName = "BestSub 本地优选"
 	}
 	if c.Clash.Subscription == "" {
 		c.Clash.Subscription = "edgetunnel"

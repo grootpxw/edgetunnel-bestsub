@@ -213,7 +213,8 @@ async function generateClash() {
   clashBtn.disabled = true;
   try {
     const result = await getJSON("/api/clash/generate", { method: "POST" });
-    showAlert(`已生成 ${result.nodes} 个节点：${result.path}`, "生成成功", "success");
+    const suffix = result.registered ? "，并已注册到 Clash Verge 配置列表" : "";
+    showAlert(`已生成 ${result.nodes} 个节点${suffix}：${result.path}`, "生成成功", "success");
   } catch (err) {
     showAlert("生成失败: " + err.message, "错误", "error");
   } finally {

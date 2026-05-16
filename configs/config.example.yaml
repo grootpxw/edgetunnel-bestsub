@@ -96,6 +96,10 @@ clash:
     local_profile_dir: ""
     # 写入 profiles 目录的文件名
     filename: "bestsub-local.yaml"
+    # 生成后自动把该 YAML 注册到 Clash Verge profiles.yaml；不会自动切换 current。
+    auto_register: true
+    profile_uid: "bestsub-local"
+    profile_name: "BestSub 本地优选"
     # 订阅名称，仅用于标识
     subscription_name: "edgetunnel"
     # 节点连接使用的域名、UUID 和 WS 路径

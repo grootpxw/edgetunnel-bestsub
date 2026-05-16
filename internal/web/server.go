@@ -237,9 +237,10 @@ func (s *Server) handleClashGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{
-		"success": true,
-		"path":    result.Path,
-		"nodes":   result.Nodes,
+		"success":    true,
+		"path":       result.Path,
+		"nodes":      result.Nodes,
+		"registered": result.Registered,
 	})
 }
 
