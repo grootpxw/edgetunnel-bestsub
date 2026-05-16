@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/app"
+	"github.com/pangxianwei/edgetunnel-bestsub/internal/clash"
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/config"
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/preflight"
+	"github.com/pangxianwei/edgetunnel-bestsub/internal/probe"
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/worker"
 )
 
@@ -49,6 +51,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/preflight", s.handlePreflight)
 	mux.HandleFunc("/api/probe/run", s.handleRun)
 	mux.HandleFunc("/api/worker/push", s.handlePush)
+	mux.HandleFunc("/api/clash/generate", s.handleClashGenerate)
 	mux.HandleFunc("/", s.handleIndex)
 
 	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
@@ -206,6 +209,38 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 
 	writeJSON(w, map[string]any{"success": true})
+}
+
+func (s *Server) handleClashGenerate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.mu.Lock()
+	if s.running {
+		s.mu.Unlock()
+		http.Error(w, "probe is currently running", http.StatusConflict)
+		return
+	}
+	if s.last == nil || len(s.last.Top) == 0 {
+		s.mu.Unlock()
+		http.Error(w, "没有可用测速结果，请先完成测速", http.StatusBadRequest)
+		return
+	}
+	cfg := s.cfg
+	top := append([]probe.Result(nil), s.last.Top...)
+	s.mu.Unlock()
+
+	result, err := clash.GenerateToLocalProfile(cfg, top)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"success": true,
+		"path":    result.Path,
+		"nodes":   result.Nodes,
+	})
 }
 
 func parseCountries(raw string) []string {

@@ -14,6 +14,7 @@ type Config struct {
 	Probe   ProbeConfig    `yaml:"probe" json:"probe"`
 	Sources []SourceConfig `yaml:"sources" json:"sources"`
 	Output  OutputConfig   `yaml:"output" json:"output"`
+	Clash   ClashConfig    `yaml:"clash" json:"clash"`
 }
 
 type ServerConfig struct {
@@ -69,6 +70,27 @@ type OutputConfig struct {
 	Path         string `yaml:"path" json:"path"`
 	RemarkPrefix string `yaml:"remark_prefix" json:"remark_prefix"`
 	DryRun       bool   `yaml:"dry_run" json:"dry_run"`
+}
+
+type ClashConfig struct {
+	LocalProfileDir string `yaml:"local_profile_dir" json:"local_profile_dir"`
+	Filename        string `yaml:"filename" json:"filename"`
+	Subscription    string `yaml:"subscription_name" json:"subscription_name"`
+	Host            string `yaml:"host" json:"host"`
+	UUID            string `yaml:"uuid" json:"uuid"`
+	Path            string `yaml:"path" json:"path"`
+	NodeType        string `yaml:"node_type" json:"node_type"`
+	Network         string `yaml:"network" json:"network"`
+	Fingerprint     string `yaml:"fingerprint" json:"fingerprint"`
+	TestURL         string `yaml:"test_url" json:"test_url"`
+	Interval        int    `yaml:"interval" json:"interval"`
+	Tolerance       int    `yaml:"tolerance" json:"tolerance"`
+	ProxyIP         string `yaml:"proxyip" json:"proxyip"`
+	EarlyData       int    `yaml:"early_data" json:"early_data"`
+	RandomPath      bool   `yaml:"random_path" json:"random_path"`
+	ECH             bool   `yaml:"ech" json:"ech"`
+	ECHSNI          string `yaml:"ech_sni" json:"ech_sni"`
+	SkipCertVerify  bool   `yaml:"skip_cert_verify" json:"skip_cert_verify"`
 }
 
 func Load(path string) (Config, error) {
@@ -143,6 +165,39 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.Output.RemarkPrefix == "" {
 		c.Output.RemarkPrefix = "IP 官方优选"
+	}
+	if c.Clash.Filename == "" {
+		c.Clash.Filename = "bestsub-local.yaml"
+	}
+	if c.Clash.Subscription == "" {
+		c.Clash.Subscription = "edgetunnel"
+	}
+	if c.Clash.Host == "" {
+		c.Clash.Host = c.Probe.Target.Host
+	}
+	if c.Clash.Path == "" {
+		c.Clash.Path = "/"
+	}
+	if c.Clash.NodeType == "" {
+		c.Clash.NodeType = "vless"
+	}
+	if c.Clash.Network == "" {
+		c.Clash.Network = "ws"
+	}
+	if c.Clash.Fingerprint == "" {
+		c.Clash.Fingerprint = "chrome"
+	}
+	if c.Clash.TestURL == "" {
+		c.Clash.TestURL = "http://www.gstatic.com/generate_204"
+	}
+	if c.Clash.Interval <= 0 {
+		c.Clash.Interval = 300
+	}
+	if c.Clash.Tolerance <= 0 {
+		c.Clash.Tolerance = 50
+	}
+	if c.Clash.ECHSNI == "" {
+		c.Clash.ECHSNI = "cloudflare-ech.com"
 	}
 }
 

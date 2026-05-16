@@ -1,6 +1,7 @@
 const configView = document.querySelector("#configView");
 const resultRows = document.querySelector("#resultRows");
 const runBtn = document.querySelector("#runBtn");
+const clashBtn = document.querySelector("#clashBtn");
 const pushBtn = document.querySelector("#pushBtn");
 const checkBtn = document.querySelector("#checkBtn");
 const envSummary = document.querySelector("#envSummary");
@@ -26,6 +27,7 @@ const modalOkBtn = document.querySelector("#modalOkBtn");
 let lastPreflight = null;
 let progressInterval = null;
 let simulatedProgress = 0;
+let clashReady = false;
 
 function getFlagEmoji(countryCode) {
   if (!countryCode || countryCode.length !== 2) return "";
@@ -112,6 +114,8 @@ modalOkBtn.addEventListener("click", () => {
 async function loadConfig() {
   const data = await getJSON("/api/config");
   const cfg = data.config;
+  clashReady = Boolean(cfg.clash?.local_profile_dir);
+  clashBtn.title = clashReady ? "生成并写入 Clash Verge profiles 目录" : "请先在 config.yaml 配置 clash.local_profile_dir";
   renderCountryOptions(cfg.probe.countries || []);
   setDL(configView, [
     ["配置文件", data.config_path],
@@ -121,6 +125,8 @@ async function loadConfig() {
     ["端口", cfg.probe.ports.join(", ")],
     ["国家筛选", (cfg.probe.countries || []).join(", ") || "未选择"],
     ["保留数量", cfg.probe.keep],
+    ["Clash 目录", cfg.clash?.local_profile_dir || "未配置"],
+    ["Clash 节点", cfg.clash?.host ? `${cfg.clash.node_type || "vless"} / ${cfg.clash.host}` : "未配置"],
     ["Dry run", cfg.output.dry_run]
   ]);
 }
@@ -128,6 +134,7 @@ async function loadConfig() {
 async function refresh() {
   const status = await getJSON("/api/status");
   runBtn.disabled = status.running;
+  clashBtn.disabled = status.running || !status.has_result || !clashReady;
   pushBtn.disabled = status.running || !status.has_result;
   setLoading(status.running, status.last_error, status.has_result, status);
 
@@ -193,6 +200,22 @@ async function push() {
     }
   } catch (err) {
     showAlert("同步失败: " + err.message, "错误", "error");
+  } finally {
+    await refresh();
+  }
+}
+
+async function generateClash() {
+  if (!clashReady) {
+    showAlert("请先在 config.yaml 配置 clash.local_profile_dir 后重启程序。", "未配置 Clash 目录", "warning");
+    return;
+  }
+  clashBtn.disabled = true;
+  try {
+    const result = await getJSON("/api/clash/generate", { method: "POST" });
+    showAlert(`已生成 ${result.nodes} 个节点：${result.path}`, "生成成功", "success");
+  } catch (err) {
+    showAlert("生成失败: " + err.message, "错误", "error");
   } finally {
     await refresh();
   }
@@ -326,6 +349,7 @@ function severityLabel(severity) {
 }
 
 runBtn.addEventListener("click", () => start().catch(err => showAlert(err.message, "执行失败", "error")));
+clashBtn.addEventListener("click", () => generateClash().catch(err => showAlert(err.message, "执行失败", "error")));
 pushBtn.addEventListener("click", () => push().catch(err => showAlert(err.message, "执行失败", "error")));
 checkBtn.addEventListener("click", () => checkEnvironment().catch(err => showAlert(err.message, "检测失败", "error")));
 clearCountryBtn.addEventListener("click", () => {

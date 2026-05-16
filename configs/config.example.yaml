@@ -90,3 +90,29 @@ output:
     remark_prefix: "IP 官方优选"
     # true 表示不真正执行 Worker 推送
     dry_run: false
+
+clash:
+    # Clash Verge profiles 目录。留空时前端“生成本地 Clash 配置”按钮会禁用。
+    local_profile_dir: ""
+    # 写入 profiles 目录的文件名
+    filename: "bestsub-local.yaml"
+    # 订阅名称，仅用于标识
+    subscription_name: "edgetunnel"
+    # 节点连接使用的域名、UUID 和 WS 路径
+    host: "your-worker.workers.dev"
+    uuid: "your_uuid"
+    path: "/"
+    node_type: "vless"
+    network: "ws"
+    fingerprint: "chrome"
+    # Clash 分组测速 URL。gstatic generate_204 对 Clash url-test 更稳定。
+    test_url: "http://www.gstatic.com/generate_204"
+    interval: 300
+    tolerance: 50
+    # 生成 WS path 时附加的参数；proxyip 留空则不追加。
+    proxyip: "off"
+    early_data: 2560
+    random_path: true
+    ech: true
+    ech_sni: "cloudflare-ech.com"
+    skip_cert_verify: false
