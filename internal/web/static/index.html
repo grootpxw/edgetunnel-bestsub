@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EdgeTunnel BestSub</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/lucide.min.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <h1>EdgeTunnel BestSub</h1>
+      <p id="subtitle">优选 Cloudflare IP，加速你的网络体验</p>
+      <div class="actions">
+        <button id="runBtn"><i data-lucide="play" style="width:18px;height:18px;margin-bottom:-4px;margin-right:4px;"></i> 开始测速</button>
+        <button id="pushBtn" class="secondary"><i data-lucide="cloud-upload" style="width:18px;height:18px;margin-bottom:-4px;margin-right:4px;"></i> 推送 ADD.txt</button>
+      </div>
+    </header>
+
+    <div id="loadingOverlay" class="loading-overlay hidden">
+      <div class="loader" style="width:18px;height:18px;border:2px solid rgba(0,0,0,0.1);border-top-color:#0071e3;border-radius:50%;animation:spin 1s linear infinite;"></div>
+      <span id="loadingText">正在准备测速...</span>
+    </div>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2><i data-lucide="zap" style="color:#0071e3"></i> 测速模式</h2>
+      </div>
+      <div class="mode-toggle" id="modeToggle">
+        <button type="button" class="mode-option selected" data-mode="quick">
+          <div class="mode-content">
+            <strong>快速模式</strong>
+            <span>日常优选，约 10-30 秒</span>
+          </div>
+          <div class="mode-check"><i data-lucide="check-circle-2"></i></div>
+        </button>
+        <button type="button" class="mode-option" data-mode="stable">
+          <div class="mode-content">
+            <strong>稳定模式</strong>
+            <span>深度测速，约 1-5 分钟</span>
+          </div>
+          <div class="mode-check"><i data-lucide="check-circle-2"></i></div>
+        </button>
+      </div>
+      
+      <!-- Premium Battery-Style Progress Bar -->
+      <div id="progressContainer" class="progress-system">
+        <div class="progress-info-top">
+          <span id="progressStatus" class="status-text">就绪</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressBarFill"></div>
+        </div>
+        <div class="progress-info-bottom">
+          <span id="progressPercent" class="percent-text">0%</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2><i data-lucide="map-pin" style="color:#0071e3"></i> 地区筛选</h2>
+        <button id="clearCountryBtn" class="secondary" style="padding: 8px 20px; font-size: 14px;">重置选择</button>
+      </div>
+      <div id="countrySelect" class="country-picker"></div>
+    </section>
+
+    <article class="panel">
+      <h2><i data-lucide="settings" style="color:#6e6e73"></i> 核心配置</h2>
+      <dl id="configView"></dl>
+    </article>
+
+    <section class="panel env-panel" id="envPanel">
+      <div class="section-head">
+        <h2><i data-lucide="shield-check" style="color:#34c759"></i> 环境预检</h2>
+        <button id="checkBtn" class="secondary" style="padding: 8px 20px; font-size: 14px;">重新检测</button>
+      </div>
+      <div id="envSummary" class="env-summary pending">
+        <span>尚未执行检测</span>
+      </div>
+      <ul id="envChecks" class="check-list"></ul>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2><i data-lucide="list" style="color:#0071e3"></i> 精选结果</h2>
+        <a href="/api/results/add.txt" target="_blank">获取 ADD.txt <i data-lucide="external-link" style="width:14px;height:14px;margin-bottom:-2px;"></i></a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>节点地址</th>
+              <th>端口</th>
+              <th>延迟 (ms)</th>
+              <th>机房</th>
+              <th>地区</th>
+              <th>状态</th>
+              <th>来源</th>
+            </tr>
+          </thead>
+          <tbody id="resultRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-icon" id="modalIcon"></div>
+      <h3 id="modalTitle">提示</h3>
+      <p id="modalMessage"></p>
+      <div class="modal-actions">
+        <button id="modalOkBtn">好</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Lucide icons
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  </script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

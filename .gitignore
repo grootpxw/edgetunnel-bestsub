@@ -1,0 +1,15 @@
+/bestsub.exe
+/bestsub
+/ADD.txt
+/configs/config.yaml
+/dist/
+/tmp/
+/coverage.out
+/seeds.txt
+/PROJECT_PLAN.md
+/JS修改版.txt
+
+*.exe
+*.log
+*.local
+*.local.yaml

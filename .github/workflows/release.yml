@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: go build -ldflags="-s -w" -o dist/bestsub-windows-amd64/bestsub.exe ./cmd/bestsub
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/bestsub-windows-amd64/configs | Out-Null
+          Copy-Item configs/config.example.yaml dist/bestsub-windows-amd64/configs/config.yaml
+          Copy-Item README.md dist/bestsub-windows-amd64/README.md
+          Compress-Archive -Path dist/bestsub-windows-amd64/* -DestinationPath dist/bestsub-windows-amd64.zip -Force
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/bestsub-windows-amd64.zip

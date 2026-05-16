@@ -1,0 +1,92 @@
+# EdgeTunnel BestSub 配置文件示例
+# 复制为 configs/config.yaml 后再填写你的真实 Worker 信息。
+
+server:
+    # 本地 Web UI 监听地址
+    listen: "127.0.0.1:8788"
+
+worker:
+    # EdgeTunnel Worker 地址，末尾不要带斜杠
+    base_url: "https://your-worker.workers.dev"
+    # Worker 管理员密码；真实值只写入 configs/config.yaml
+    password: "your_password"
+    # 推送 ADD.txt 时使用的 User-Agent
+    user_agent: "bestsub-go/0.1"
+
+probe:
+    target:
+        # 当前推荐使用 worker 模式，按你的 Worker 域名做真实访问探测
+        mode: "worker"
+        # 建议指向 Worker 下的轻量资源，例如 robots.txt
+        url: "https://your-worker.workers.dev/robots.txt"
+        # HTTP Host 头
+        host: "your-worker.workers.dev"
+        # TLS SNI
+        sni: "your-worker.workers.dev"
+        # HTTP 请求方法
+        method: "HEAD"
+        # 这些状态码会被视为 HTTP 探测成功
+        expected_status: [200, 204, 301, 302, 403, 404]
+
+    preflight:
+        # 测速前环境预检，主要用于避免系统代理影响结果
+        enabled: true
+        # 跳过抽样低延迟探测，只检测系统代理；更适合日常使用
+        disable_sample_probe: true
+        # 抽样探测数量；disable_sample_probe 为 true 时不会使用
+        sample_size: 8
+        # 检测到异常低延迟时是否阻止测速
+        block_on_low_latency: true
+        # 异常低延迟阈值，单位 ms
+        low_latency_threshold_ms: 20
+
+    # 是否启用 IPv4 / IPv6 探测
+    ipv4: true
+    ipv6: false
+
+    # 国家/地区过滤。留空表示不过滤，也可以在 Web UI 中选择后自动保存。
+    countries: []
+
+    # Cloudflare 支持的 HTTPS 端口
+    ports: [443, 2053, 2083, 2087, 2096, 8443]
+
+    # 候选数量越大，耗时越长；稳定模式会在运行时自动放大该值
+    candidate_limit: 600
+    # 最终保留的优选 IP 数量
+    keep: 30
+    # 单个 IP 探测超时时间，单位 ms
+    timeout_ms: 2500
+    # 并发探测数量
+    concurrency: 120
+    # 每个 IPv4 /24 子网最多保留的结果数量
+    per_cidr24_limit: 2
+
+sources:
+    - type: "remote"
+      name: "cmliu-cf-cidr"
+      url: "https://raw.githubusercontent.com/cmliu/cmliu/main/CF-CIDR.txt"
+      path: ""
+      weight: 120
+    - type: "remote"
+      name: "xiu2-ipv4"
+      url: "https://raw.githubusercontent.com/XIU2/CloudflareSpeedTest/master/ip.txt"
+      path: ""
+      weight: 100
+    - type: "remote"
+      name: "cf-ipv6"
+      url: "https://www.cloudflare.com/ips-v6"
+      path: ""
+      weight: 80
+    - type: "file"
+      name: "local-seeds"
+      url: ""
+      path: "seeds.txt"
+      weight: 200
+
+output:
+    # 测速结果输出文件
+    path: "ADD.txt"
+    # ADD.txt 每行备注前缀
+    remark_prefix: "IP 官方优选"
+    # true 表示不真正执行 Worker 推送
+    dry_run: false
