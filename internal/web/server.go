@@ -233,6 +233,9 @@ func (s *Server) handleClashGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := s.cfg
+	if s.last.AutoProxyIPs != "" {
+		cfg.Clash.ProxyIP = s.last.AutoProxyIPs
+	}
 	top := append([]probe.Result(nil), s.last.Top...)
 	s.mu.Unlock()
 
@@ -265,6 +268,9 @@ func (s *Server) handleClashYAML(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := s.cfg
+	if s.last.AutoProxyIPs != "" {
+		cfg.Clash.ProxyIP = s.last.AutoProxyIPs
+	}
 	top := append([]probe.Result(nil), s.last.Top...)
 	s.mu.Unlock()
 

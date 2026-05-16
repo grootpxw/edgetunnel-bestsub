@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"net/netip"
@@ -13,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/oschwald/geoip2-golang"
 
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/config"
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/source"
@@ -40,6 +43,18 @@ func Run(ctx context.Context, cfg config.Config, candidates []source.Candidate) 
 	if len(candidates) == 0 {
 		return nil
 	}
+
+	var geoIPDB *geoip2.Reader
+	if cfg.Probe.RequireGeoIPMatch {
+		db, err := geoip2.Open(cfg.Probe.GeoIPDBPath)
+		if err != nil {
+			log.Printf("Failed to open GeoIP DB at %s: %v", cfg.Probe.GeoIPDBPath, err)
+		} else {
+			geoIPDB = db
+			defer geoIPDB.Close()
+		}
+	}
+
 	workerCount := cfg.Probe.Concurrency
 	if workerCount <= 0 {
 		workerCount = 100
@@ -53,7 +68,7 @@ func Run(ctx context.Context, cfg config.Config, candidates []source.Candidate) 
 		go func() {
 			defer wg.Done()
 			for candidate := range jobs {
-				results <- One(ctx, cfg, candidate)
+				results <- One(ctx, cfg, candidate, geoIPDB)
 			}
 		}()
 	}
@@ -82,7 +97,7 @@ func Run(ctx context.Context, cfg config.Config, candidates []source.Candidate) 
 	return out
 }
 
-func One(ctx context.Context, cfg config.Config, candidate source.Candidate) Result {
+func One(ctx context.Context, cfg config.Config, candidate source.Candidate, geoIPDB *geoip2.Reader) Result {
 	result := Result{
 		IP:           candidate.IP,
 		Port:         candidate.Port,
@@ -162,6 +177,17 @@ func One(ctx context.Context, cfg config.Config, candidate source.Candidate) Res
 	result.Success = statusOK(resp.StatusCode, cfg.Probe.Target.ExpectedStatus)
 	if !result.Success {
 		result.Error = resp.Status
+	} else if geoIPDB != nil && result.CountryCode != "" {
+		ip := net.ParseIP(result.IP)
+		if ip != nil {
+			record, err := geoIPDB.Country(ip)
+			if err == nil && record.Country.IsoCode != "" {
+				if !strings.EqualFold(record.Country.IsoCode, result.CountryCode) {
+					result.Success = false
+					result.Error = fmt.Sprintf("GeoIP mismatch: %s != %s", record.Country.IsoCode, result.CountryCode)
+				}
+			}
+		}
 	}
 	return result
 }

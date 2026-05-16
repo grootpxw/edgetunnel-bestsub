@@ -62,7 +62,11 @@ func Load(ctx context.Context, cfg config.Config) ([]Candidate, error) {
 	randomBudget := max(0, limit-len(direct))
 	randoms := generateFromCIDRs(cidrs, cfg, randomBudget)
 
-	return dedupe(append(direct, randoms...)), nil
+	candidates := dedupe(append(direct, randoms...))
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("sources were loaded, but no valid IP candidates were parsed")
+	}
+	return candidates, nil
 }
 
 type sourceToken struct {

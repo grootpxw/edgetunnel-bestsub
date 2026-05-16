@@ -112,6 +112,8 @@ probe:
 - `timeout_ms`：单个 IP 的探测超时时间。
 - `concurrency`：并发探测数量，过高可能造成网络抖动。
 - `countries`：国家/地区过滤，例如 `[HK, JP, SG]`。
+- `require_geoip_match`：是否强制要求 IP 注册归属地和 Cloudflare 访问节点国家一致，默认 `false`。
+- `geoip_db_path`：GeoIP 数据库路径；只有 `require_geoip_match: true` 时才会使用。
 - `output.path`：生成的订阅文件路径，默认 `ADD.txt`。
 - `output.dry_run`：是否禁用真实推送。
 - `clash.local_profile_dir`：Clash Verge profiles 目录；留空时前端不会允许生成本地 Clash 配置。
@@ -130,6 +132,26 @@ probe:
 
 远程来源会在测速时下载；如果网络环境访问 GitHub 不稳定，可以把常用 IP 放入 `seeds.txt`。
 
+## GeoIP 数据库
+
+默认配置不需要 `GeoLite2-Country.mmdb`。项目不会自动下载该文件，也不建议把 `.mmdb` 数据库提交到 GitHub。
+
+`countries` 筛选使用的是 Cloudflare 返回的 `CF-Ray` 访问机房信息，例如 HKG、NRT、SIN，并不等同于 IP Whois 或 GeoIP 注册地。Cloudflare Anycast IP 经常出现“注册地是美国，但实际访问机房在日本/新加坡/香港”的情况，所以默认保持：
+
+```yaml
+require_geoip_match: false
+geoip_db_path: ""
+```
+
+只有在你明确想过滤掉“IP 注册归属地和访问机房国家不一致”的结果时，才需要开启：
+
+```yaml
+require_geoip_match: true
+geoip_db_path: "GeoLite2-Country.mmdb"
+```
+
+开启后需要自行从 MaxMind 下载 GeoLite2 Country 数据库，并把 `GeoLite2-Country.mmdb` 放到程序运行目录，或把 `geoip_db_path` 改成实际文件路径。如果文件不存在，程序不会自动下载。
+
 ## ADD.txt 格式
 
 程序会生成兼容 EdgeTunnel Worker 的文本格式，IPv6 会自动使用方括号：
@@ -145,6 +167,7 @@ probe:
 
 - 测速前建议关闭系统代理，否则测速结果可能只是本机代理出口。
 - 国家/地区筛选基于 Cloudflare 访问节点信息，不等同于 Whois 查询到的 IP 注册地。
+- `GeoLite2-Country.mmdb` 是可选高级功能依赖，默认不需要；发布项目时不要提交该数据库文件。
 - Cloudflare Anycast IP 状态会变化，优选结果适合定期刷新，不建议长期固定。
 - 推送能力依赖你的 Worker 登录逻辑和 `/admin/ADD.txt` 接口，请先用 `dry_run` 或手动检查结果确认。
 

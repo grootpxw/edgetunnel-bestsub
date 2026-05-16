@@ -6,27 +6,30 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/config"
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/preflight"
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/probe"
+	"github.com/pangxianwei/edgetunnel-bestsub/internal/proxyip"
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/source"
 	"github.com/pangxianwei/edgetunnel-bestsub/internal/worker"
 )
 
 type RunResult struct {
-	StartedAt  time.Time         `json:"started_at"`
-	FinishedAt time.Time         `json:"finished_at"`
-	Mode       string            `json:"mode"`
-	Candidates int               `json:"candidates"`
-	Results    []probe.Result    `json:"results"`
-	Top        []probe.Result    `json:"top"`
-	ADDText    string            `json:"add_text"`
-	OutputPath string            `json:"output_path"`
-	Pushed     bool              `json:"pushed"`
-	PushError  string            `json:"push_error,omitempty"`
-	Preflight  *preflight.Report `json:"preflight,omitempty"`
+	StartedAt    time.Time         `json:"started_at"`
+	FinishedAt   time.Time         `json:"finished_at"`
+	Mode         string            `json:"mode"`
+	Candidates   int               `json:"candidates"`
+	Results      []probe.Result    `json:"results"`
+	Top          []probe.Result    `json:"top"`
+	ADDText      string            `json:"add_text"`
+	OutputPath   string            `json:"output_path"`
+	Pushed       bool              `json:"pushed"`
+	PushError    string            `json:"push_error,omitempty"`
+	Preflight    *preflight.Report `json:"preflight,omitempty"`
+	AutoProxyIPs string            `json:"auto_proxy_ips,omitempty"`
 }
 
 func RunOnce(ctx context.Context, cfg config.Config, push bool) (RunResult, error) {
@@ -59,6 +62,13 @@ func RunOnceMode(ctx context.Context, cfg config.Config, push bool, mode string)
 
 	if err := writeOutput(cfg.Output.Path, addText); err != nil {
 		return RunResult{}, err
+	}
+
+	if cfg.Clash.AutoProxyIP.Enabled {
+		fetchedIPs, err := proxyip.FetchAndCheck(cfg.Clash.AutoProxyIP.Country, cfg.Clash.AutoProxyIP.Limit)
+		if err == nil && len(fetchedIPs) > 0 {
+			run.AutoProxyIPs = strings.Join(fetchedIPs, ",")
+		}
 	}
 
 	run.FinishedAt = time.Now()

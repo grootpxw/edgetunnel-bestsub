@@ -28,17 +28,19 @@ type WorkerConfig struct {
 }
 
 type ProbeConfig struct {
-	Target         TargetConfig    `yaml:"target" json:"target"`
-	Preflight      PreflightConfig `yaml:"preflight" json:"preflight"`
-	IPv4           bool            `yaml:"ipv4" json:"ipv4"`
-	IPv6           bool            `yaml:"ipv6" json:"ipv6"`
-	Countries      []string        `yaml:"countries,flow" json:"countries"`
-	Ports          []int           `yaml:"ports,flow" json:"ports"`
-	CandidateLimit int             `yaml:"candidate_limit" json:"candidate_limit"`
-	Keep           int             `yaml:"keep" json:"keep"`
-	TimeoutMS      int             `yaml:"timeout_ms" json:"timeout_ms"`
-	Concurrency    int             `yaml:"concurrency" json:"concurrency"`
-	PerCIDR24Limit int             `yaml:"per_cidr24_limit" json:"per_cidr24_limit"`
+	Target            TargetConfig    `yaml:"target" json:"target"`
+	Preflight         PreflightConfig `yaml:"preflight" json:"preflight"`
+	IPv4              bool            `yaml:"ipv4" json:"ipv4"`
+	IPv6              bool            `yaml:"ipv6" json:"ipv6"`
+	Countries         []string        `yaml:"countries,flow" json:"countries"`
+	RequireGeoIPMatch bool            `yaml:"require_geoip_match" json:"require_geoip_match"`
+	GeoIPDBPath       string          `yaml:"geoip_db_path" json:"geoip_db_path"`
+	Ports             []int           `yaml:"ports,flow" json:"ports"`
+	CandidateLimit    int             `yaml:"candidate_limit" json:"candidate_limit"`
+	Keep              int             `yaml:"keep" json:"keep"`
+	TimeoutMS         int             `yaml:"timeout_ms" json:"timeout_ms"`
+	Concurrency       int             `yaml:"concurrency" json:"concurrency"`
+	PerCIDR24Limit    int             `yaml:"per_cidr24_limit" json:"per_cidr24_limit"`
 }
 
 type TargetConfig struct {
@@ -72,28 +74,35 @@ type OutputConfig struct {
 	DryRun       bool   `yaml:"dry_run" json:"dry_run"`
 }
 
+type AutoProxyIPConfig struct {
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	Country string `yaml:"country" json:"country"`
+	Limit   int    `yaml:"limit" json:"limit"`
+}
+
 type ClashConfig struct {
-	LocalProfileDir string `yaml:"local_profile_dir" json:"local_profile_dir"`
-	Filename        string `yaml:"filename" json:"filename"`
-	AutoRegister    bool   `yaml:"auto_register" json:"auto_register"`
-	ProfileUID      string `yaml:"profile_uid" json:"profile_uid"`
-	ProfileName     string `yaml:"profile_name" json:"profile_name"`
-	Subscription    string `yaml:"subscription_name" json:"subscription_name"`
-	Host            string `yaml:"host" json:"host"`
-	UUID            string `yaml:"uuid" json:"uuid"`
-	Path            string `yaml:"path" json:"path"`
-	NodeType        string `yaml:"node_type" json:"node_type"`
-	Network         string `yaml:"network" json:"network"`
-	Fingerprint     string `yaml:"fingerprint" json:"fingerprint"`
-	TestURL         string `yaml:"test_url" json:"test_url"`
-	Interval        int    `yaml:"interval" json:"interval"`
-	Tolerance       int    `yaml:"tolerance" json:"tolerance"`
-	ProxyIP         string `yaml:"proxyip" json:"proxyip"`
-	EarlyData       int    `yaml:"early_data" json:"early_data"`
-	RandomPath      bool   `yaml:"random_path" json:"random_path"`
-	ECH             bool   `yaml:"ech" json:"ech"`
-	ECHSNI          string `yaml:"ech_sni" json:"ech_sni"`
-	SkipCertVerify  bool   `yaml:"skip_cert_verify" json:"skip_cert_verify"`
+	LocalProfileDir string            `yaml:"local_profile_dir" json:"local_profile_dir"`
+	Filename        string            `yaml:"filename" json:"filename"`
+	AutoRegister    bool              `yaml:"auto_register" json:"auto_register"`
+	ProfileUID      string            `yaml:"profile_uid" json:"profile_uid"`
+	ProfileName     string            `yaml:"profile_name" json:"profile_name"`
+	Subscription    string            `yaml:"subscription_name" json:"subscription_name"`
+	Host            string            `yaml:"host" json:"host"`
+	UUID            string            `yaml:"uuid" json:"uuid"`
+	Path            string            `yaml:"path" json:"path"`
+	NodeType        string            `yaml:"node_type" json:"node_type"`
+	Network         string            `yaml:"network" json:"network"`
+	Fingerprint     string            `yaml:"fingerprint" json:"fingerprint"`
+	TestURL         string            `yaml:"test_url" json:"test_url"`
+	Interval        int               `yaml:"interval" json:"interval"`
+	Tolerance       int               `yaml:"tolerance" json:"tolerance"`
+	ProxyIP         string            `yaml:"proxyip" json:"proxyip"`
+	AutoProxyIP     AutoProxyIPConfig `yaml:"proxyip_auto" json:"proxyip_auto"`
+	EarlyData       int               `yaml:"early_data" json:"early_data"`
+	RandomPath      bool              `yaml:"random_path" json:"random_path"`
+	ECH             bool              `yaml:"ech" json:"ech"`
+	ECHSNI          string            `yaml:"ech_sni" json:"ech_sni"`
+	SkipCertVerify  bool              `yaml:"skip_cert_verify" json:"skip_cert_verify"`
 }
 
 func Load(path string) (Config, error) {
@@ -163,6 +172,9 @@ func (c *Config) ApplyDefaults() {
 	if c.Probe.PerCIDR24Limit <= 0 {
 		c.Probe.PerCIDR24Limit = 2
 	}
+	if c.Probe.RequireGeoIPMatch && c.Probe.GeoIPDBPath == "" {
+		c.Probe.GeoIPDBPath = "GeoLite2-Country.mmdb"
+	}
 	if c.Output.Path == "" {
 		c.Output.Path = "ADD.txt"
 	}
@@ -204,6 +216,9 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.Clash.Tolerance <= 0 {
 		c.Clash.Tolerance = 50
+	}
+	if c.Clash.AutoProxyIP.Limit <= 0 {
+		c.Clash.AutoProxyIP.Limit = 8
 	}
 	if c.Clash.ECHSNI == "" {
 		c.Clash.ECHSNI = "cloudflare-ech.com"

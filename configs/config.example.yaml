@@ -46,6 +46,12 @@ probe:
 
     # 国家/地区过滤。留空表示不过滤，也可以在 Web UI 中选择后自动保存。
     countries: []
+    
+    # 是否强制验证 IP 在 GeoIP 数据库中的注册归属地。
+    # 默认关闭：Cloudflare Anycast 的注册地和实际访问机房经常不一致，关闭后不需要 GeoLite2-Country.mmdb。
+    # 如需开启，请自行下载 MaxMind GeoLite2 Country 数据库并放到 geoip_db_path 指定位置。
+    require_geoip_match: false
+    geoip_db_path: ""
 
     # Cloudflare 支持的 HTTPS 端口
     ports: [443, 2053, 2083, 2087, 2096, 8443]
@@ -114,7 +120,16 @@ clash:
     interval: 300
     tolerance: 50
     # 生成 WS path 时附加的参数；proxyip 留空则不追加。
-    proxyip: "off"
+    proxyip: ""
+    
+    # 自动获取并测速优选反代 IP
+    proxyip_auto:
+        enabled: true
+        # 目标国家代码（单选，如 "JP", "US", "HK"）
+        country: "JP"
+        # 最多将几个可用的反代 IP 拼接到配置中
+        limit: 8
+
     early_data: 2560
     random_path: true
     ech: true

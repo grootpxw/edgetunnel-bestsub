@@ -172,12 +172,23 @@ func wsPath(cfg config.Config, index int) string {
 	}
 	if cfg.Clash.RandomPath {
 		prefix := randomPathPrefixes[index%len(randomPathPrefixes)]
-		if path == "/" {
-			return "/" + prefix
-		}
-		return "/" + prefix + strings.TrimPrefix(path, "/")
+		return prependPathSegment(path, prefix)
 	}
 	return path
+}
+
+func prependPathSegment(path string, segment string) string {
+	segment = strings.Trim(segment, "/")
+	if segment == "" {
+		return path
+	}
+	if path == "" || path == "/" {
+		return "/" + segment
+	}
+	if strings.HasPrefix(path, "/?") {
+		return "/" + segment + strings.TrimPrefix(path, "/")
+	}
+	return "/" + segment + "/" + strings.TrimPrefix(path, "/")
 }
 
 func proxyGroups(cfg config.Config, nodeNames []string) []map[string]any {

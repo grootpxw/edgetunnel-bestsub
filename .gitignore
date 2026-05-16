@@ -8,8 +8,10 @@
 /seeds.txt
 /PROJECT_PLAN.md
 /JS修改版.txt
+/GeoLite2-Country.mmdb
 
 *.exe
 *.log
 *.local
 *.local.yaml
+*.mmdb
