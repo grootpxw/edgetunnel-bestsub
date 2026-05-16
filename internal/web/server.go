@@ -5,7 +5,11 @@ import (
 	"embed"
 	"encoding/json"
 	"mime"
+	"net"
 	"net/http"
+	"net/url"
+	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -52,6 +56,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/probe/run", s.handleRun)
 	mux.HandleFunc("/api/worker/push", s.handlePush)
 	mux.HandleFunc("/api/clash/generate", s.handleClashGenerate)
+	mux.HandleFunc("/api/clash/local.yaml", s.handleClashYAML)
 	mux.HandleFunc("/", s.handleIndex)
 
 	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
@@ -236,12 +241,77 @@ func (s *Server) handleClashGenerate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	registered := false
+	if cfg.Clash.AutoRegister {
+		if err := openClashImportURL(s.clashImportURL()); err != nil {
+			http.Error(w, "生成成功，但调用 Clash 导入失败: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		registered = true
+	}
 	writeJSON(w, map[string]any{
 		"success":    true,
 		"path":       result.Path,
 		"nodes":      result.Nodes,
-		"registered": result.Registered,
+		"registered": registered,
 	})
+}
+
+func (s *Server) handleClashYAML(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	if s.last == nil || len(s.last.Top) == 0 {
+		s.mu.Unlock()
+		http.Error(w, "没有可用测速结果，请先完成测速", http.StatusBadRequest)
+		return
+	}
+	cfg := s.cfg
+	top := append([]probe.Result(nil), s.last.Top...)
+	s.mu.Unlock()
+
+	body, err := clash.Build(cfg, top)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	filename := strings.TrimSpace(cfg.Clash.Filename)
+	if filename == "" {
+		filename = "bestsub-local.yaml"
+	}
+	displayName := strings.TrimSpace(cfg.Clash.ProfileName)
+	if displayName == "" {
+		displayName = filename
+	}
+	if !strings.HasSuffix(strings.ToLower(displayName), ".yaml") && !strings.HasSuffix(strings.ToLower(displayName), ".yml") {
+		displayName += ".yaml"
+	}
+	w.Header().Set("Content-Type", "application/x-yaml; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"; filename*=UTF-8''`+url.PathEscape(displayName))
+	w.Header().Set("Profile-Update-Interval", "24")
+	w.Header().Set("Profile-Web-Page-Url", "http://"+s.localHTTPAddr()+"/")
+	_, _ = w.Write([]byte(body))
+}
+
+func (s *Server) clashImportURL() string {
+	return "http://" + s.localHTTPAddr() + "/api/clash/local.yaml"
+}
+
+func (s *Server) localHTTPAddr() string {
+	host, port, err := net.SplitHostPort(s.cfg.Server.Listen)
+	if err != nil {
+		return s.cfg.Server.Listen
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" || host == "[::]" {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, port)
+}
+
+func openClashImportURL(profileURL string) error {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	importURL := "clash://install-config?url=" + url.QueryEscape(profileURL)
+	return exec.Command("rundll32", "url.dll,FileProtocolHandler", importURL).Start()
 }
 
 func parseCountries(raw string) []string {

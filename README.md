@@ -115,6 +115,7 @@ probe:
 - `output.path`：生成的订阅文件路径，默认 `ADD.txt`。
 - `output.dry_run`：是否禁用真实推送。
 - `clash.local_profile_dir`：Clash Verge profiles 目录；留空时前端不会允许生成本地 Clash 配置。
+- `clash.auto_register`：生成后调用 Clash Verge 官方 URL Scheme 导入配置；不会自动切换当前配置。
 - `clash.uuid` / `clash.host`：生成 VLESS WebSocket 节点需要的基础参数。
 - `clash.test_url`：Clash 分组测速地址，推荐 `http://www.gstatic.com/generate_204`。
 
