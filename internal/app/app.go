@@ -65,7 +65,21 @@ func RunOnceMode(ctx context.Context, cfg config.Config, push bool, mode string)
 	}
 
 	if cfg.Clash.AutoProxyIP.Enabled {
-		fetchedIPs, err := proxyip.FetchAndCheck(cfg.Clash.AutoProxyIP.Country, cfg.Clash.AutoProxyIP.Limit)
+		fetchedIPs, err := proxyip.FetchAndCheck(ctx, proxyip.Options{
+			Country:           cfg.Clash.AutoProxyIP.Country,
+			Limit:             cfg.Clash.AutoProxyIP.Limit,
+			SourceURL:         cfg.Clash.AutoProxyIP.SourceURL,
+			RequireGeoIPMatch: cfg.Clash.AutoProxyIP.RequireGeoIPMatch,
+			GeoIPDBPath:       cfg.Clash.AutoProxyIP.GeoIPDBPath,
+			WorkerVerify: proxyip.WorkerVerifyOptions{
+				Enabled:   cfg.Clash.AutoProxyIP.WorkerVerify.Enabled,
+				URL:       cfg.Clash.AutoProxyIP.WorkerVerify.URL,
+				MaxChecks: cfg.Clash.AutoProxyIP.WorkerVerify.MaxChecks,
+			},
+			WorkerBaseURL:  cfg.Worker.BaseURL,
+			WorkerPassword: cfg.Worker.Password,
+			UserAgent:      cfg.Worker.UserAgent,
+		})
 		if err == nil && len(fetchedIPs) > 0 {
 			run.AutoProxyIPs = strings.Join(fetchedIPs, ",")
 		}
@@ -152,17 +166,29 @@ func rerunStable(ctx context.Context, cfg config.Config, first []probe.Result) [
 			Weight: result.SourceWeight,
 		})
 	}
-	second := probe.Run(ctx, cfg, candidates)
-	merged := mergeStable(first, second)
-	probe.Sort(merged)
-	return merged
+	rounds := [][]probe.Result{successful}
+	const extraRounds = 3
+	for i := 0; i < extraRounds; i++ {
+		select {
+		case <-ctx.Done():
+			return mergeStable(rounds)
+		default:
+		}
+		rounds = append(rounds, probe.Run(ctx, cfg, candidates))
+	}
+	return mergeStable(rounds)
 }
 
-func mergeStable(first []probe.Result, second []probe.Result) []probe.Result {
+func mergeStable(rounds [][]probe.Result) []probe.Result {
 	type acc struct {
-		best  probe.Result
-		count int
-		total int64
+		best       probe.Result
+		attempts   int
+		successes  int
+		totalTotal int64
+		totalHTTP  int64
+		totalTCP   int64
+		totalTLS   int64
+		weight     int
 	}
 	items := map[string]*acc{}
 	add := func(result probe.Result) {
@@ -170,31 +196,46 @@ func mergeStable(first []probe.Result, second []probe.Result) []probe.Result {
 		current := items[key]
 		if current == nil {
 			copy := result
-			items[key] = &acc{best: copy}
+			items[key] = &acc{best: copy, weight: result.SourceWeight}
 			current = items[key]
 		}
+		current.attempts++
+		if result.SourceWeight > current.weight {
+			current.weight = result.SourceWeight
+		}
 		if result.Success {
-			current.count++
-			current.total += result.TotalMS
+			current.successes++
+			current.totalTotal += result.TotalMS
+			current.totalHTTP += result.HTTPMS
+			current.totalTCP += result.TCPMS
+			current.totalTLS += result.TLSMS
 			if !current.best.Success || result.TotalMS < current.best.TotalMS {
 				current.best = result
 			}
 		}
 	}
-	for _, result := range first {
-		add(result)
-	}
-	for _, result := range second {
-		add(result)
+	for _, round := range rounds {
+		for _, result := range round {
+			add(result)
+		}
 	}
 	out := make([]probe.Result, 0, len(items))
 	for _, item := range items {
 		result := item.best
-		if item.count > 1 {
-			result.TotalMS = item.total / int64(item.count)
-			result.HTTPMS = result.TotalMS
+		result.Attempts = item.attempts
+		result.Successes = item.successes
+		if item.attempts > 0 {
+			result.SuccessRate = item.successes * 100 / item.attempts
 		}
-		result.SourceWeight += item.count * 20
+		result.Success = item.successes > 0
+		if item.successes > 0 {
+			count := int64(item.successes)
+			result.TotalMS = item.totalTotal / count
+			result.HTTPMS = item.totalHTTP / count
+			result.TCPMS = item.totalTCP / count
+			result.TLSMS = item.totalTLS / count
+		}
+		result.SourceWeight = item.weight
 		out = append(out, result)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -202,10 +243,22 @@ func mergeStable(first []probe.Result, second []probe.Result) []probe.Result {
 		if a.Success != b.Success {
 			return a.Success
 		}
+		if a.SuccessRate != b.SuccessRate {
+			return a.SuccessRate > b.SuccessRate
+		}
+		if a.Successes != b.Successes {
+			return a.Successes > b.Successes
+		}
+		if a.TotalMS != b.TotalMS {
+			return a.TotalMS < b.TotalMS
+		}
+		if a.HTTPMS != b.HTTPMS {
+			return a.HTTPMS < b.HTTPMS
+		}
 		if a.SourceWeight != b.SourceWeight {
 			return a.SourceWeight > b.SourceWeight
 		}
-		return a.TotalMS < b.TotalMS
+		return a.Port < b.Port
 	})
 	return out
 }

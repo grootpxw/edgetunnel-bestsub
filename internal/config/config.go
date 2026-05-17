@@ -75,9 +75,19 @@ type OutputConfig struct {
 }
 
 type AutoProxyIPConfig struct {
-	Enabled bool   `yaml:"enabled" json:"enabled"`
-	Country string `yaml:"country" json:"country"`
-	Limit   int    `yaml:"limit" json:"limit"`
+	Enabled           bool                    `yaml:"enabled" json:"enabled"`
+	Country           string                  `yaml:"country" json:"country"`
+	Limit             int                     `yaml:"limit" json:"limit"`
+	SourceURL         string                  `yaml:"source_url" json:"source_url"`
+	RequireGeoIPMatch bool                    `yaml:"require_geoip_match" json:"require_geoip_match"`
+	GeoIPDBPath       string                  `yaml:"geoip_db_path" json:"geoip_db_path"`
+	WorkerVerify      AutoProxyIPVerifyConfig `yaml:"worker_verify" json:"worker_verify"`
+}
+
+type AutoProxyIPVerifyConfig struct {
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	URL       string `yaml:"url" json:"url"`
+	MaxChecks int    `yaml:"max_checks" json:"max_checks"`
 }
 
 type ClashConfig struct {
@@ -219,6 +229,18 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.Clash.AutoProxyIP.Limit <= 0 {
 		c.Clash.AutoProxyIP.Limit = 8
+	}
+	if c.Clash.AutoProxyIP.SourceURL == "" {
+		c.Clash.AutoProxyIP.SourceURL = "https://zip.cm.edu.kg/all.txt"
+	}
+	if c.Clash.AutoProxyIP.GeoIPDBPath == "" {
+		c.Clash.AutoProxyIP.GeoIPDBPath = c.Probe.GeoIPDBPath
+	}
+	if c.Clash.AutoProxyIP.WorkerVerify.URL == "" {
+		c.Clash.AutoProxyIP.WorkerVerify.URL = "https://cloudflare.com/cdn-cgi/trace"
+	}
+	if c.Clash.AutoProxyIP.WorkerVerify.MaxChecks <= 0 {
+		c.Clash.AutoProxyIP.WorkerVerify.MaxChecks = c.Clash.AutoProxyIP.Limit * 3
 	}
 	if c.Clash.ECHSNI == "" {
 		c.Clash.ECHSNI = "cloudflare-ech.com"

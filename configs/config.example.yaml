@@ -129,6 +129,13 @@ clash:
         country: "JP"
         # 最多将几个可用的反代 IP 拼接到配置中
         limit: 8
+        source_url: "https://zip.cm.edu.kg/all.txt"
+        require_geoip_match: false
+        geoip_db_path: "GeoLite2-Country.mmdb"
+        worker_verify:
+            enabled: false
+            url: "https://cloudflare.com/cdn-cgi/trace"
+            max_checks: 24
 
     early_data: 2560
     random_path: true

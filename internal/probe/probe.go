@@ -37,6 +37,9 @@ type Result struct {
 	Success      bool   `json:"success"`
 	Error        string `json:"error,omitempty"`
 	SourceWeight int    `json:"source_weight"`
+	Attempts     int    `json:"attempts,omitempty"`
+	Successes    int    `json:"successes,omitempty"`
+	SuccessRate  int    `json:"success_rate,omitempty"`
 }
 
 func Run(ctx context.Context, cfg config.Config, candidates []source.Candidate) []Result {
@@ -97,19 +100,26 @@ func Run(ctx context.Context, cfg config.Config, candidates []source.Candidate) 
 	return out
 }
 
-func One(ctx context.Context, cfg config.Config, candidate source.Candidate, geoIPDB *geoip2.Reader) Result {
-	result := Result{
+func One(ctx context.Context, cfg config.Config, candidate source.Candidate, geoIPDB *geoip2.Reader) (result Result) {
+	result = Result{
 		IP:           candidate.IP,
 		Port:         candidate.Port,
 		Source:       candidate.Source,
 		Remark:       candidate.Remark,
 		SourceWeight: candidate.Weight,
 	}
+	defer func() {
+		result.Attempts = 1
+		if result.Success {
+			result.Successes = 1
+			result.SuccessRate = 100
+		}
+	}()
 
 	targetURL, err := url.Parse(cfg.Probe.Target.URL)
 	if err != nil {
 		result.Error = err.Error()
-		return result
+		return
 	}
 	path := targetURL.RequestURI()
 	if path == "" {
@@ -130,14 +140,14 @@ func One(ctx context.Context, cfg config.Config, candidate source.Candidate, geo
 	if err != nil {
 		result.TotalMS = elapsedMS(startTotal)
 		result.Error = err.Error()
-		return result
+		return
 	}
 	result.TCPMS = elapsedMS(startTCP)
 	defer conn.Close()
 
 	if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
 		result.Error = err.Error()
-		return result
+		return
 	}
 
 	tlsConn := tls.Client(conn, &tls.Config{
@@ -148,7 +158,7 @@ func One(ctx context.Context, cfg config.Config, candidate source.Candidate, geo
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		result.TotalMS = elapsedMS(startTotal)
 		result.Error = err.Error()
-		return result
+		return
 	}
 	result.TLSMS = elapsedMS(startTLS)
 	defer tlsConn.Close()
@@ -159,13 +169,13 @@ func One(ctx context.Context, cfg config.Config, candidate source.Candidate, geo
 	if _, err := tlsConn.Write([]byte(request)); err != nil {
 		result.TotalMS = elapsedMS(startTotal)
 		result.Error = err.Error()
-		return result
+		return
 	}
 	resp, err := http.ReadResponse(bufio.NewReader(tlsConn), nil)
 	if err != nil {
 		result.TotalMS = elapsedMS(startTotal)
 		result.Error = err.Error()
-		return result
+		return
 	}
 	defer resp.Body.Close()
 
@@ -189,7 +199,7 @@ func One(ctx context.Context, cfg config.Config, candidate source.Candidate, geo
 			}
 		}
 	}
-	return result
+	return
 }
 
 func Sort(results []Result) {
