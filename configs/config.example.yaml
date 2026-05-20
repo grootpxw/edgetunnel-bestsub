@@ -296,3 +296,9 @@ clash:
     # 是否跳过 TLS 证书验证
     # 生产环境建议保持 false
     skip_cert_verify: false
+
+    # 外部规则文件路径（相对路径或绝对路径）
+    # 留空则使用内置的基础规则
+    # 规则文件中引用的代理组如果不在生成的分组中，会自动替换为 ♻️ 自动选择
+    # 格式：每行一条规则，如 DOMAIN-SUFFIX,google.com,🚀 节点选择
+    rules_file: "configs/rules.txt"
