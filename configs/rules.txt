@@ -1,0 +1,26 @@
+# Clash 规则文件
+# 仅直连本机、局域网、链路本地和保留地址，其它全部进入 ♻️ 自动选择
+# 未知代理组会在生成 Clash 配置时自动替换为 ♻️ 自动选择
+
+DOMAIN-SUFFIX,ip6-localhost,🎯 全球直连
+DOMAIN-SUFFIX,ip6-loopback,🎯 全球直连
+DOMAIN-SUFFIX,internal,🎯 全球直连
+DOMAIN-SUFFIX,lan,🎯 全球直连
+DOMAIN-SUFFIX,local,🎯 全球直连
+DOMAIN-SUFFIX,localhost,🎯 全球直连
+IP-CIDR,0.0.0.0/8,🎯 全球直连,no-resolve
+IP-CIDR,10.0.0.0/8,🎯 全球直连,no-resolve
+IP-CIDR,100.64.0.0/10,🎯 全球直连,no-resolve
+IP-CIDR,127.0.0.0/8,🎯 全球直连,no-resolve
+IP-CIDR,169.254.0.0/16,🎯 全球直连,no-resolve
+IP-CIDR,172.16.0.0/12,🎯 全球直连,no-resolve
+IP-CIDR,192.168.0.0/16,🎯 全球直连,no-resolve
+IP-CIDR,198.18.0.0/15,🎯 全球直连,no-resolve
+IP-CIDR,224.0.0.0/4,🎯 全球直连,no-resolve
+IP-CIDR,240.0.0.0/4,🎯 全球直连,no-resolve
+IP-CIDR6,::1/128,🎯 全球直连,no-resolve
+IP-CIDR6,fc00::/7,🎯 全球直连,no-resolve
+IP-CIDR6,fe80::/10,🎯 全球直连,no-resolve
+IP-CIDR6,fd00::/8,🎯 全球直连,no-resolve
+IP-CIDR6,ff00::/8,🎯 全球直连,no-resolve
+MATCH,♻️ 自动选择

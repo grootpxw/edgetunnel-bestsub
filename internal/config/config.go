@@ -116,6 +116,7 @@ type ClashConfig struct {
 	ECH             bool              `yaml:"ech" json:"ech"`
 	ECHSNI          string            `yaml:"ech_sni" json:"ech_sni"`
 	SkipCertVerify  bool              `yaml:"skip_cert_verify" json:"skip_cert_verify"`
+	RulesFile       string            `yaml:"rules_file" json:"rules_file"`
 }
 
 func Load(path string) (Config, error) {

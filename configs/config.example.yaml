@@ -213,23 +213,25 @@ clash:
     # 默认值: "chrome"
     fingerprint: "chrome"
 
-    # --- 代理组测速参数 ---
-    # Clash 代理组自动测速使用的 URL
-    # gstatic generate_204 对 Clash url-test 更稳定
+    # --- 代理组健康检查参数 ---
+    # Clash fallback 分组健康检查使用的 URL
+    # gstatic generate_204 对 Clash 健康检查更稳定
     # 默认值: "http://www.gstatic.com/generate_204"
     test_url: "http://www.gstatic.com/generate_204"
-    # 自动测速间隔，单位秒
+    # 健康检查间隔，单位秒
     # 默认值: 300
     interval: 300
-    # url-test 容差值，单位毫秒
-    # 延迟差异在此范围内不会触发节点切换
+    # 兼容保留项：fallback 分组不会使用该容差值
     # 默认值: 50
     tolerance: 50
+    # 外部规则文件；默认仅直连本机/局域网/保留地址，其它全部落到 "♻️ 自动选择"
+    # 留空则使用内置基础规则
+    rules_file: "configs/rules.txt"
 
     # --- ProxyIP 配置 ---
-    # 手动指定的反代 IP（proxyip）
-    # 生成 WS path 时会附加 /proxyip=xxx 参数
-    # 留空则不追加 proxyip 参数
+    # 手动强制写入本地 Clash WS path 的反代 IP（proxyip）
+    # 日常使用 /admin/PROXYIP.txt 推送 Worker 动态反代时建议留空
+    # 填写后会附加 /proxyip=xxx，并覆盖 Worker KV 中的 PROXYIP.txt
     proxyip: ""
     
     # proxyip_auto: 单独优选反代 IP

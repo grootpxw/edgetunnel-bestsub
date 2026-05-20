@@ -1,6 +1,7 @@
 package clash
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,10 +13,10 @@ import (
 )
 
 const (
-	nodeSelectGroup = "🚀 节点选择"
-	autoSelectGroup = "♻️ 自动选择"
-	directGroup     = "🎯 全球直连"
-	blockGroup      = "🛑 全球拦截"
+	legacyNodeSelectGroup = "🚀 节点选择"
+	autoSelectGroup       = "♻️ 自动选择"
+	directGroup           = "🎯 全球直连"
+	blockGroup            = "🛑 全球拦截"
 )
 
 var randomPathPrefixes = []string{
@@ -72,7 +73,7 @@ func Build(cfg config.Config, results []probe.Result) (string, error) {
 
 	doc := map[string]any{
 		"profile": map[string]any{
-			"store-selected": true,
+			"store-selected": false,
 			"store-fake-ip":  true,
 		},
 		"dns":          dnsBlock(cfg),
@@ -83,7 +84,7 @@ func Build(cfg config.Config, results []probe.Result) (string, error) {
 		"log-level":    "info",
 		"proxies":      nodes,
 		"proxy-groups": proxyGroups(cfg, nodeNames),
-		"rules":        rules(),
+		"rules":        resolveRules(cfg),
 	}
 
 	out, err := yaml.Marshal(doc)
@@ -192,28 +193,18 @@ func prependPathSegment(path string, segment string) string {
 }
 
 func proxyGroups(cfg config.Config, nodeNames []string) []map[string]any {
-	nodeSelectProxies := append([]string{autoSelectGroup, "DIRECT"}, nodeNames...)
 	return []map[string]any{
 		{
-			"name":      nodeSelectGroup,
-			"type":      "select",
-			"url":       cfg.Clash.TestURL,
-			"interval":  cfg.Clash.Interval,
-			"tolerance": cfg.Clash.Tolerance,
-			"proxies":   nodeSelectProxies,
-		},
-		{
-			"name":      autoSelectGroup,
-			"type":      "url-test",
-			"url":       cfg.Clash.TestURL,
-			"interval":  cfg.Clash.Interval,
-			"tolerance": cfg.Clash.Tolerance,
-			"proxies":   nodeNames,
+			"name":     autoSelectGroup,
+			"type":     "fallback",
+			"url":      cfg.Clash.TestURL,
+			"interval": cfg.Clash.Interval,
+			"proxies":  nodeNames,
 		},
 		{
 			"name":    directGroup,
 			"type":    "select",
-			"proxies": []string{"DIRECT", nodeSelectGroup, autoSelectGroup},
+			"proxies": []string{"DIRECT", autoSelectGroup},
 		},
 		{
 			"name":    blockGroup,
@@ -225,7 +216,6 @@ func proxyGroups(cfg config.Config, nodeNames []string) []map[string]any {
 
 func rules() []string {
 	return []string{
-		"DOMAIN-SUFFIX,acl4.ssr," + directGroup,
 		"DOMAIN-SUFFIX,ip6-localhost," + directGroup,
 		"DOMAIN-SUFFIX,ip6-loopback," + directGroup,
 		"DOMAIN-SUFFIX,internal," + directGroup,
@@ -239,17 +229,95 @@ func rules() []string {
 		"IP-CIDR,169.254.0.0/16," + directGroup + ",no-resolve",
 		"IP-CIDR,172.16.0.0/12," + directGroup + ",no-resolve",
 		"IP-CIDR,192.168.0.0/16," + directGroup + ",no-resolve",
-		"IP-CIDR,198.18.0.0/16," + directGroup + ",no-resolve",
+		"IP-CIDR,198.18.0.0/15," + directGroup + ",no-resolve",
 		"IP-CIDR,224.0.0.0/4," + directGroup + ",no-resolve",
+		"IP-CIDR,240.0.0.0/4," + directGroup + ",no-resolve",
 		"IP-CIDR6,::1/128," + directGroup + ",no-resolve",
 		"IP-CIDR6,fc00::/7," + directGroup + ",no-resolve",
 		"IP-CIDR6,fe80::/10," + directGroup + ",no-resolve",
 		"IP-CIDR6,fd00::/8," + directGroup + ",no-resolve",
-		"GEOSITE,private," + directGroup,
-		"GEOIP,private," + directGroup + ",no-resolve",
-		"GEOIP,CN," + directGroup,
-		"MATCH," + nodeSelectGroup,
+		"IP-CIDR6,ff00::/8," + directGroup + ",no-resolve",
+		"MATCH," + autoSelectGroup,
 	}
+}
+
+// loadRulesFromFile 从外部文件加载规则，并将手动选择/未知代理组替换为自动选择。
+func loadRulesFromFile(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	knownGroups := map[string]bool{
+		autoSelectGroup: true,
+		directGroup:     true,
+		blockGroup:      true,
+		"DIRECT":        true,
+		"REJECT":        true,
+	}
+
+	var result []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// 去掉 YAML list 前缀 "- "
+		line = strings.TrimPrefix(line, "- ")
+		line = strings.TrimSpace(line)
+		line = strings.Trim(line, `"'`)
+		if line == "" {
+			continue
+		}
+		result = append(result, resolveRuleGroup(line, knownGroups))
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("rules file %s is empty", path)
+	}
+	return result, nil
+}
+
+// resolveRuleGroup 将规则中的旧手动选择分组或未知代理组替换为自动选择。
+func resolveRuleGroup(rule string, knownGroups map[string]bool) string {
+	// 规则格式: TYPE,VALUE,GROUP 或 TYPE,VALUE,GROUP,no-resolve
+	// 特殊: MATCH,GROUP
+	parts := strings.Split(rule, ",")
+	if len(parts) < 2 {
+		return rule
+	}
+
+	var groupIdx int
+	ruleType := strings.ToUpper(strings.TrimSpace(parts[0]))
+	if ruleType == "MATCH" {
+		groupIdx = 1
+	} else if len(parts) >= 3 {
+		groupIdx = 2
+	} else {
+		return rule
+	}
+
+	group := strings.TrimSpace(parts[groupIdx])
+	if group == legacyNodeSelectGroup || !knownGroups[group] {
+		parts[groupIdx] = autoSelectGroup
+	}
+	return strings.Join(parts, ",")
+}
+
+// resolveRules 根据配置决定使用外部规则文件还是内置规则
+func resolveRules(cfg config.Config) []string {
+	if cfg.Clash.RulesFile != "" {
+		loaded, err := loadRulesFromFile(cfg.Clash.RulesFile)
+		if err == nil {
+			return loaded
+		}
+		// 加载失败则回退到内置规则
+	}
+	return rules()
 }
 
 func dnsBlock(cfg config.Config) map[string]any {

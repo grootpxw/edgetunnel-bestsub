@@ -119,7 +119,9 @@ probe:
 - `clash.local_profile_dir`：Clash Verge profiles 目录；留空时前端不会允许生成本地 Clash 配置。
 - `clash.auto_register`：生成后调用 Clash Verge 官方 URL Scheme 导入配置；不会自动切换当前配置。
 - `clash.uuid` / `clash.host`：生成 VLESS WebSocket 节点需要的基础参数。
-- `clash.test_url`：Clash 分组测速地址，推荐 `http://www.gstatic.com/generate_204`。
+- `clash.test_url`：Clash fallback 分组健康检查地址，推荐 `http://www.gstatic.com/generate_204`。
+- `clash.rules_file`：外部 Clash 规则文件；默认只直连本机/局域网/保留地址，其它全部进入 `♻️ 自动选择`。
+- `clash.proxyip`：手动写死到本地 Clash path 的反代；使用 Worker 动态 `PROXYIP.txt` 时应留空。
 
 ## IP 来源
 
