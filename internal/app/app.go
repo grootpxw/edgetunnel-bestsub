@@ -161,17 +161,14 @@ func normalizeMode(mode string) string {
 
 func applyMode(cfg config.Config, mode string) config.Config {
 	if mode == "stable" {
-		if cfg.Probe.CandidateLimit < 1200 {
-			cfg.Probe.CandidateLimit = 1200
+		if cfg.Probe.CandidateLimit < 1800 {
+			cfg.Probe.CandidateLimit = 1800
 		}
-		if cfg.Probe.TimeoutMS < 3000 {
-			cfg.Probe.TimeoutMS = 3000
+		if cfg.Probe.TimeoutMS < 4000 {
+			cfg.Probe.TimeoutMS = 4000
 		}
-		if cfg.Probe.Concurrency > 160 {
-			cfg.Probe.Concurrency = 160
-		}
-		if cfg.Probe.Keep < 50 {
-			cfg.Probe.Keep = 50
+		if cfg.Probe.Concurrency > 100 {
+			cfg.Probe.Concurrency = 100
 		}
 		return cfg
 	}
@@ -206,12 +203,21 @@ func rerunStable(ctx context.Context, cfg config.Config, first []probe.Result) [
 		})
 	}
 	rounds := [][]probe.Result{successful}
-	const extraRounds = 3
+	const extraRounds = 5
 	for i := 0; i < extraRounds; i++ {
 		select {
 		case <-ctx.Done():
 			return mergeStable(rounds)
 		default:
+		}
+		if i > 0 {
+			timer := time.NewTimer(2 * time.Second)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return mergeStable(rounds)
+			case <-timer.C:
+			}
 		}
 		rounds = append(rounds, probe.Run(ctx, cfg, candidates))
 	}
@@ -227,6 +233,8 @@ func mergeStable(rounds [][]probe.Result) []probe.Result {
 		totalHTTP  int64
 		totalTCP   int64
 		totalTLS   int64
+		minTotal   int64
+		maxTotal   int64
 		weight     int
 	}
 	items := map[string]*acc{}
@@ -248,6 +256,12 @@ func mergeStable(rounds [][]probe.Result) []probe.Result {
 			current.totalHTTP += result.HTTPMS
 			current.totalTCP += result.TCPMS
 			current.totalTLS += result.TLSMS
+			if current.minTotal == 0 || result.TotalMS < current.minTotal {
+				current.minTotal = result.TotalMS
+			}
+			if result.TotalMS > current.maxTotal {
+				current.maxTotal = result.TotalMS
+			}
 			if !current.best.Success || result.TotalMS < current.best.TotalMS {
 				current.best = result
 			}
@@ -279,6 +293,13 @@ func mergeStable(rounds [][]probe.Result) []probe.Result {
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		a, b := out[i], out[j]
+		spread := func(result probe.Result) int64 {
+			item := items[fmt.Sprintf("%s:%d", result.IP, result.Port)]
+			if item == nil || item.successes <= 1 {
+				return 1<<63 - 1
+			}
+			return item.maxTotal - item.minTotal
+		}
 		if a.Success != b.Success {
 			return a.Success
 		}
@@ -287,6 +308,11 @@ func mergeStable(rounds [][]probe.Result) []probe.Result {
 		}
 		if a.Successes != b.Successes {
 			return a.Successes > b.Successes
+		}
+		aSpread := spread(a)
+		bSpread := spread(b)
+		if aSpread != bSpread {
+			return aSpread < bSpread
 		}
 		if a.TotalMS != b.TotalMS {
 			return a.TotalMS < b.TotalMS
