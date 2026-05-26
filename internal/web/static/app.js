@@ -1,52 +1,5 @@
-const configView = document.querySelector("#configView");
-const resultRows = document.querySelector("#resultRows");
-const runBtn = document.querySelector("#runBtn");
-const clashBtn = document.querySelector("#clashBtn");
-const pushBtn = document.querySelector("#pushBtn");
-const proxyPushBtn = document.querySelector("#proxyPushBtn");
-const checkBtn = document.querySelector("#checkBtn");
-const envSummary = document.querySelector("#envSummary");
-const envChecks = document.querySelector("#envChecks");
-const envPanel = document.querySelector("#envPanel");
-const countrySelect = document.querySelector("#countrySelect");
-const clearCountryBtn = document.querySelector("#clearCountryBtn");
-const modeToggle = document.querySelector("#modeToggle");
-const loadingOverlay = document.querySelector("#loadingOverlay");
-const loadingText = document.querySelector("#loadingText");
-const proxyipSummary = document.querySelector("#proxyipSummary");
-const proxyipFetchBtn = document.querySelector("#proxyipFetchBtn");
-const proxyipDropdown = document.querySelector("#proxyipDropdown");
-const proxyipDropdownTrigger = document.querySelector("#proxyipDropdownTrigger");
-const proxyipDropdownLabel = document.querySelector("#proxyipDropdownLabel");
-const proxyipDropdownMenu = document.querySelector("#proxyipDropdownMenu");
-let proxyipSelectedCountry = "US";
-
-const progressContainer = document.querySelector("#progressContainer");
-const progressBarFill = document.querySelector("#progressBarFill");
-const progressPercent = document.querySelector("#progressPercent");
-const progressStatus = document.querySelector("#progressStatus");
-
-const modalOverlay = document.querySelector("#modalOverlay");
-const modalTitle = document.querySelector("#modalTitle");
-const modalMessage = document.querySelector("#modalMessage");
-const modalIcon = document.querySelector("#modalIcon");
-const modalOkBtn = document.querySelector("#modalOkBtn");
-
-let lastPreflight = null;
-let progressInterval = null;
-let simulatedProgress = 0;
-let clashReady = false;
-let latestAutoProxyIPs = "";
-
-function getFlagEmoji(countryCode) {
-  if (!countryCode || countryCode.length !== 2) return "";
-  const code = countryCode.toUpperCase();
-  if (code === "TW") return "🇹🇼";
-  if (code === "HK") return "🇭🇰";
-  return code.replace(/./g, char => 
-    String.fromCodePoint(char.charCodeAt(0) + 127397)
-  );
-}
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
 const countryOptions = [
   ["JP", "日本"], ["SG", "新加坡"], ["HK", "香港"], ["TW", "台湾"], ["KR", "韩国"],
@@ -56,443 +9,456 @@ const countryOptions = [
   ["IN", "印度"], ["BR", "巴西"], ["MX", "墨西哥"], ["ZA", "南非"], ["AE", "阿联酋"]
 ];
 
-const SVGS = {
-  info: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
-  success: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-  error: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
-  warning: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+const state = {
+  config: null,
+  configPath: "",
+  latest: null,
+  running: false,
+  progressTimer: null,
+  progress: 0
 };
 
-async function getJSON(url, options) {
-  const response = await fetch(url, options);
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
+const els = {
+  statusDot: $("#statusDot"),
+  statusText: $("#statusText"),
+  loadingOverlay: $("#loadingOverlay"),
+  loadingText: $("#loadingText"),
+  runBtn: $("#runBtn"),
+  copyAddBtn: $("#copyAddBtn"),
+  pushBtn: $("#pushBtn"),
+  copyProxyBtn: $("#copyProxyBtn"),
+  proxyPushBtn: $("#proxyPushBtn"),
+  proxyipFetchBtn: $("#proxyipFetchBtn"),
+  countrySelect: $("#countrySelect"),
+  clearCountryBtn: $("#clearCountryBtn"),
+  modeToggle: $("#modeToggle"),
+  resultRows: $("#resultRows"),
+  addText: $("#addText"),
+  proxyText: $("#proxyText"),
+  proxyipSummary: $("#proxyipSummary"),
+  proxyipCount: $("#proxyipCount"),
+  proxyCountrySelect: $("#proxyCountrySelect"),
+  proxyLimitView: $("#proxyLimitView"),
+  proxyCandidatesView: $("#proxyCandidatesView"),
+  progressContainer: $("#progressContainer"),
+  progressBarFill: $("#progressBarFill"),
+  progressPercent: $("#progressPercent"),
+  progressStatus: $("#progressStatus"),
+  configForm: $("#configForm"),
+  saveConfigBtn: $("#saveConfigBtn"),
+  checkBtn: $("#checkBtn"),
+  envPanel: $("#envPanel"),
+  envSummary: $("#envSummary"),
+  envChecks: $("#envChecks"),
+  modalOverlay: $("#modalOverlay"),
+  modalTitle: $("#modalTitle"),
+  modalMessage: $("#modalMessage"),
+  modalIcon: $("#modalIcon"),
+  modalOkBtn: $("#modalOkBtn")
+};
+
+const modalIcons = {
+  info: "info",
+  success: "circle-check",
+  error: "circle-alert",
+  warning: "triangle-alert"
+};
+
+function flag(code) {
+  if (!code || code.length !== 2) return "";
+  return code.toUpperCase().replace(/./g, ch => String.fromCodePoint(ch.charCodeAt(0) + 127397));
 }
 
-function setDL(node, rows) {
-  node.innerHTML = rows.map(([key, value]) => `
-    <dt>${escapeHTML(key)}</dt>
-    <dd>${value instanceof HTMLElement ? value.outerHTML : escapeHTML(String(value ?? ""))}</dd>
-  `).join("");
+function countryName(code) {
+  return countryOptions.find(([item]) => item === code)?.[1] || code;
 }
 
 function escapeHTML(value) {
-  if (value && value.startsWith("<span")) return value;
-  return value.replace(/[&<>"']/g, ch => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[ch]));
 }
 
-function translateError(msg) {
-  if (msg.includes("Failed to fetch")) return "无法连接到服务器，请检查程序是否启动。";
-  if (msg.includes("NetworkError")) return "网络请求失败。";
-  if (msg.includes("selectedMode is not defined")) return "程序内部逻辑错误（模式选择未定义）。";
-  if (msg.includes("no candidates loaded")) return "未加载到候选 IP，请检查网络（如 GitHub 访问）或配置文件中的 Sources。";
-  return msg;
+async function getJSON(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) throw new Error((await response.text()).trim());
+  return response.json();
+}
+
+async function copyText(text, label) {
+  if (!text || !text.trim()) {
+    showAlert("当前没有可复制的结果。", "提示", "warning");
+    return;
+  }
+  await navigator.clipboard.writeText(text.trim());
+  showAlert(`${label} 已复制到剪贴板。`, "复制成功", "success");
 }
 
 function showAlert(message, title = "提示", type = "info") {
-  modalTitle.textContent = title;
-  modalMessage.textContent = translateError(message);
-  
-  const colorMap = {
-    info: { main: "#0071e3", bg: "rgba(0, 113, 227, 0.1)" },
-    success: { main: "#34c759", bg: "rgba(52, 199, 89, 0.1)" },
-    error: { main: "#ff3b30", bg: "rgba(255, 59, 48, 0.1)" },
-    warning: { main: "#ff9500", bg: "rgba(255, 149, 0, 0.1)" }
-  };
-  
-  const colors = colorMap[type] || colorMap.info;
-  const svg = SVGS[type] || SVGS.info;
-  
-  modalIcon.innerHTML = svg;
-  modalIcon.style.color = colors.main;
-  modalIcon.style.backgroundColor = colors.bg;
-  
-  modalOverlay.classList.remove("hidden");
+  els.modalTitle.textContent = title;
+  els.modalMessage.textContent = translateError(message);
+  els.modalIcon.innerHTML = `<i data-lucide="${modalIcons[type] || modalIcons.info}"></i>`;
+  els.modalIcon.className = `modal-icon ${type}`;
+  els.modalOverlay.classList.remove("hidden");
+  if (window.lucide) lucide.createIcons();
 }
 
-modalOkBtn.addEventListener("click", () => {
-  modalOverlay.classList.add("hidden");
-});
+function translateError(message) {
+  const msg = String(message || "");
+  if (msg.includes("Failed to fetch")) return "无法连接本地服务，请确认工具正在运行。";
+  if (msg.includes("no candidates loaded")) return "未加载到候选 IP，请检查来源配置或网络。";
+  if (msg.includes("proxyip_auto 未启用")) return "反代 IP 功能未启用，请到系统配置开启。";
+  return msg;
+}
+
+function setRunning(running, label = "任务运行中...") {
+  state.running = running;
+  els.loadingOverlay.classList.toggle("hidden", !running);
+  els.loadingText.textContent = label;
+  els.statusDot.classList.toggle("running", running);
+  els.statusText.textContent = running ? label : "就绪";
+}
+
+function updateActions() {
+  const hasAdd = Boolean(state.latest?.add_text);
+  const hasProxy = Boolean(state.latest?.auto_proxy_ips);
+  els.runBtn.disabled = state.running;
+  els.pushBtn.disabled = state.running || !hasAdd;
+  els.copyAddBtn.disabled = !hasAdd;
+  els.proxyipFetchBtn.disabled = state.running;
+  els.proxyPushBtn.disabled = state.running || !hasProxy;
+  els.copyProxyBtn.disabled = !hasProxy;
+  els.saveConfigBtn.disabled = state.running;
+}
+
+function switchView(name) {
+  $$(".nav-item").forEach(button => button.classList.toggle("active", button.dataset.view === name));
+  $$(".view").forEach(view => view.classList.toggle("active", view.id === `view-${name}`));
+}
+
+function renderCountryOptions(selected) {
+  const selectedSet = new Set(selected || []);
+  els.countrySelect.innerHTML = countryOptions.map(([code, name]) => `
+    <button type="button" class="country-chip ${selectedSet.has(code) ? "selected" : ""}" data-code="${code}" aria-pressed="${selectedSet.has(code)}">
+      <span>${flag(code)}</span><b>${escapeHTML(name)}</b><em>${code}</em>
+    </button>
+  `).join("");
+}
+
+function fillCountrySelect(select, selected) {
+  select.innerHTML = countryOptions.map(([code, name]) => (
+    `<option value="${code}" ${code === selected ? "selected" : ""}>${flag(code)} ${name} (${code})</option>`
+  )).join("");
+}
+
+function selectedCountries() {
+  return $$("#countrySelect .country-chip.selected").map(button => button.dataset.code);
+}
+
+function selectedMode() {
+  return $("#modeToggle .segment.selected")?.dataset.mode || "quick";
+}
 
 async function loadConfig() {
   const data = await getJSON("/api/config");
-  const cfg = data.config;
-  clashReady = Boolean(cfg.clash?.local_profile_dir);
-  clashBtn.title = clashReady ? "生成并写入 Clash Verge profiles 目录" : "请先在 config.yaml 配置 clash.local_profile_dir";
-  renderCountryOptions(cfg.probe.countries || []);
-  renderProxyIPCountrySelect(cfg.clash?.proxyip_auto?.country || "US");
-  setDL(configView, [
-    ["配置文件", data.config_path],
-    ["监听地址", cfg.server.listen],
-    ["Worker", cfg.worker.base_url],
-    ["测速 URL", cfg.probe.target.url],
-    ["端口", cfg.probe.ports.join(", ")],
-    ["国家筛选", (cfg.probe.countries || []).join(", ") || "未选择"],
-    ["保留数量", cfg.probe.keep],
-    ["Clash 目录", cfg.clash?.local_profile_dir || "未配置"],
-    ["Clash 节点", cfg.clash?.host ? `${cfg.clash.node_type || "vless"} / ${cfg.clash.host}` : "未配置"],
-    ["Dry run", cfg.output.dry_run]
-  ]);
+  state.config = data.config;
+  state.configPath = data.config_path;
+  renderCountryOptions(state.config.probe?.countries || []);
+  fillCountrySelect(els.proxyCountrySelect, state.config.clash?.proxyip_auto?.country || "US");
+  fillCountrySelect($("#configProxyCountry"), state.config.clash?.proxyip_auto?.country || "US");
+  els.proxyLimitView.value = state.config.clash?.proxyip_auto?.limit || 8;
+  els.proxyCandidatesView.value = state.config.clash?.proxyip_auto?.max_candidates || 50;
+  fillConfigForm(state.config);
 }
 
 async function refresh() {
   const status = await getJSON("/api/status");
-  runBtn.disabled = status.running;
-  clashBtn.disabled = status.running || !status.has_result || !clashReady;
-  pushBtn.disabled = status.running || !status.has_result;
-  proxyPushBtn.disabled = status.running || !latestAutoProxyIPs;
-  setLoading(status.running, status.last_error, status.has_result, status);
+  setRunning(status.running, status.running ? "任务运行中..." : "就绪");
+  if (status.last_error) {
+    els.statusText.textContent = translateError(status.last_error);
+    els.statusDot.classList.add("error");
+  } else {
+    els.statusDot.classList.remove("error");
+  }
 
   if (status.has_result) {
-    const latest = await getJSON("/api/results/latest");
-    latestAutoProxyIPs = latest.auto_proxy_ips || "";
-    proxyPushBtn.disabled = status.running || !latestAutoProxyIPs;
-    renderProxyIPSummary(latestAutoProxyIPs);
-    if (latest.top && latest.top.length === 0 && status.last_success > 0) {
-      // Logic for filtered out but found IPs
-      progressStatus.textContent = `找到了 ${status.last_success} 个有效 IP，但都不符合国家筛选条件。`;
+    state.latest = await getJSON("/api/results/latest");
+    renderResults(state.latest);
+    renderProxyResult(state.latest.auto_proxy_ips || "");
+    if (!status.running) {
+      const success = status.last_success || 0;
+      progressDone(success, status.last_candidates || 0, (state.latest.top || []).length);
     }
-    resultRows.innerHTML = (latest.top || []).map(row => `
-      <tr>
-        <td>${escapeHTML(row.ip)}</td>
-        <td>${row.port}</td>
-        <td>${row.total_ms}ms</td>
-        <td>${escapeHTML(row.colo || "")}</td>
-        <td>${escapeHTML(countryDisplay(row))}</td>
-        <td>${row.status_code}</td>
-        <td>${escapeHTML(row.source || "")}</td>
-      </tr>
-    `).join("");
+  }
+  updateActions();
+}
+
+function renderResults(latest) {
+  els.addText.value = latest.add_text || "";
+  els.resultRows.innerHTML = (latest.top || []).map(row => `
+    <tr>
+      <td><code>${escapeHTML(row.ip)}</code></td>
+      <td>${row.port || ""}</td>
+      <td>${row.total_ms ? `${row.total_ms}ms` : ""}</td>
+      <td>${escapeHTML(row.colo || "")}</td>
+      <td>${escapeHTML(row.country_code ? `${flag(row.country_code)} ${row.country_name || countryName(row.country_code)} (${row.country_code})` : "未知")}</td>
+      <td>${row.status_code || ""}</td>
+      <td>${escapeHTML(row.source || "")}</td>
+    </tr>
+  `).join("");
+}
+
+function renderProxyResult(value) {
+  els.proxyText.value = value || "";
+  const items = String(value || "").split(",").map(item => item.trim()).filter(Boolean);
+  els.proxyipCount.textContent = items.length ? `${items.length} 个结果` : "暂无结果";
+  els.proxyipSummary.innerHTML = items.map(item => `<code>${escapeHTML(item)}</code>`).join("");
+}
+
+function startProgress() {
+  clearInterval(state.progressTimer);
+  state.progress = 0;
+  updateProgress(0, "正在准备");
+  const duration = selectedMode() === "stable" ? 180 : 25;
+  state.progressTimer = setInterval(() => {
+    if (state.progress < 96) {
+      state.progress += 100 / (duration * 4);
+      updateProgress(state.progress, "测速中");
+    }
+  }, 250);
+}
+
+function updateProgress(percent, text) {
+  const value = Math.max(0, Math.min(100, percent));
+  els.progressContainer.className = "progress-system running";
+  els.progressBarFill.style.width = `${value}%`;
+  els.progressPercent.textContent = `${Math.floor(value)}%`;
+  els.progressStatus.textContent = text;
+}
+
+function progressDone(success, candidates, restored = 0) {
+  clearInterval(state.progressTimer);
+  state.progressTimer = null;
+  const hasResult = success > 0 || restored > 0;
+  els.progressContainer.className = hasResult ? "progress-system success" : "progress-system error";
+  els.progressBarFill.style.width = "100%";
+  els.progressPercent.textContent = "100%";
+  if (success > 0) {
+    els.progressStatus.textContent = `完成，找到 ${success} 个有效 IP`;
+  } else if (restored > 0) {
+    els.progressStatus.textContent = `已恢复 ${restored} 条历史结果`;
+  } else {
+    els.progressStatus.textContent = `扫描 ${candidates} 个候选，无可用结果`;
   }
 }
 
-function renderProxyIPSummary(value) {
-  if (!value) {
-    proxyipSummary.className = "proxyip-summary muted";
-    proxyipSummary.textContent = "暂无反代优选结果。点击优选反代 IP 后，这里会显示可推送的 PROXYIP。";
-    return;
-  }
-  const items = value.split(",").map(item => item.trim()).filter(Boolean);
-  proxyipSummary.className = "proxyip-summary";
-  proxyipSummary.innerHTML = `
-    <div class="proxyip-count">已筛出 ${items.length} 个 PROXYIP</div>
-    <div class="proxyip-list">${items.map(item => `<code>${escapeHTML(item)}</code>`).join("")}</div>
-  `;
-}
-
-async function start() {
-  const report = await checkEnvironment();
-  if (report.blocked) {
-    showAlert("环境检测未通过。请关闭代理后再测速。", "环境异常", "error");
-    return;
-  }
-  
+async function startProbe() {
   const countries = selectedCountries();
-  if (countries.length === 0) {
-    showAlert("请至少选择一个国家后再开始测速。", "提醒", "warning");
+  if (!countries.length) {
+    showAlert("请至少选择一个地区。", "缺少地区", "warning");
     return;
   }
-
-  try {
-    await getJSON("/api/config/update", {
-      method: "POST",
-      body: JSON.stringify({ countries })
-    });
-    await loadConfig();
-  } catch (err) {
-    console.error("Save config failed:", err);
-  }
-
-  const mode = selectedMode();
-  const params = new URLSearchParams();
-  params.set("mode", mode);
-  params.set("countries", countries.join(","));
-  
-  simulatedProgress = 0;
+  await getJSON("/api/config/update", {
+    method: "POST",
+    body: JSON.stringify({ countries })
+  });
+  await loadConfig();
+  startProgress();
+  const params = new URLSearchParams({ mode: selectedMode(), countries: countries.join(",") });
   await getJSON(`/api/probe/run?${params.toString()}`, { method: "POST" });
   await refresh();
 }
 
-async function push() {
-  pushBtn.disabled = true;
-  try {
-    const result = await getJSON("/api/worker/push", { method: "POST" });
-    if (result.success) {
-      showAlert("测速结果已成功同步至远程 Worker。", "推送成功", "success");
+async function pushADD() {
+  const result = await getJSON("/api/worker/push", { method: "POST" });
+  if (result.success) showAlert("ADD.txt 已同步到 Cloudflare Worker。", "同步成功", "success");
+  await refresh();
+}
+
+async function fetchProxyIP() {
+  const country = els.proxyCountrySelect.value || "US";
+  setRunning(true, "反代 IP 优选中...");
+  await getJSON(`/api/proxyip/fetch?country=${encodeURIComponent(country)}`, { method: "POST" });
+  for (let i = 0; i < 150; i++) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const status = await getJSON("/api/status");
+    if (!status.running) {
+      if (status.last_error) showAlert(`反代 IP 优选失败：${status.last_error}`, "执行失败", "error");
+      else showAlert("反代 IP 优选完成。", "完成", "success");
+      break;
     }
-  } catch (err) {
-    showAlert("同步失败: " + err.message, "错误", "error");
-  } finally {
-    await refresh();
   }
+  await loadConfig();
+  await refresh();
 }
 
 async function pushProxyIP() {
-  proxyPushBtn.disabled = true;
-  try {
-    const result = await getJSON("/api/worker/proxyip", { method: "POST" });
-    if (result.success) {
-      showAlert(`PROXYIP 已推送到 Worker：${result.proxy_ip}`, "推送成功", "success");
-    }
-  } catch (err) {
-    showAlert("PROXYIP 推送失败: " + err.message, "错误", "error");
-  } finally {
-    await refresh();
-  }
-}
-
-async function fetchProxyIPOnly() {
-  proxyipFetchBtn.disabled = true;
-  proxyipSummary.className = "proxyip-summary muted";
-  proxyipSummary.textContent = "正在优选反代 IP...";
-
-  // 先检测环境
-  const report = await checkEnvironment();
-  if (report.blocked) {
-    showAlert("环境检测未通过。请关闭代理后再优选反代 IP。", "环境异常", "error");
-    proxyipFetchBtn.disabled = false;
-    await refresh();
-    return;
-  }
-
-  try {
-    await getJSON("/api/proxyip/fetch?country=" + encodeURIComponent(proxyipSelectedCountry), { method: "POST" });
-    // 轮询等待完成
-    let attempts = 0;
-    while (attempts < 120) {
-      await new Promise(r => setTimeout(r, 2000));
-      const status = await getJSON("/api/status");
-      if (!status.running) {
-        if (status.last_error) {
-          showAlert("反代 IP 优选失败: " + status.last_error, "错误", "error");
-        } else {
-          showAlert("反代 IP 优选完成", "成功", "success");
-        }
-        break;
-      }
-      attempts++;
-    }
-  } catch (err) {
-    showAlert("反代 IP 优选失败: " + err.message, "错误", "error");
-  } finally {
-    proxyipFetchBtn.disabled = false;
-    await refresh();
-  }
-}
-
-async function generateClash() {
-  if (!clashReady) {
-    showAlert("请先在 config.yaml 配置 clash.local_profile_dir 后重启程序。", "未配置 Clash 目录", "warning");
-    return;
-  }
-  clashBtn.disabled = true;
-  try {
-    const result = await getJSON("/api/clash/generate", { method: "POST" });
-    const suffix = result.registered ? "，并已注册到 Clash Verge 配置列表" : "";
-    showAlert(`已生成 ${result.nodes} 个节点${suffix}：${result.path}`, "生成成功", "success");
-  } catch (err) {
-    showAlert("生成失败: " + err.message, "错误", "error");
-  } finally {
-    await refresh();
-  }
-}
-
-function selectedMode() {
-  return modeToggle.querySelector(".mode-option.selected")?.dataset.mode || "quick";
-}
-
-function setLoading(running, lastError, hasResult, statusData) {
-  loadingOverlay.classList.toggle("hidden", !running);
-  
-  if (running) {
-    progressContainer.className = "progress-system running";
-    if (!progressInterval) {
-      const mode = selectedMode();
-      const duration = mode === "stable" ? 180 : 20;
-      progressInterval = setInterval(() => {
-        if (simulatedProgress < 98) {
-          simulatedProgress += (100 / (duration * 10));
-          updateProgress(simulatedProgress, "Loading...");
-        }
-      }, 100);
-    }
-    loadingText.textContent = "测速任务运行中...";
-  } else {
-    if (progressInterval) {
-      clearInterval(progressInterval);
-      progressInterval = null;
-    }
-    if (lastError) {
-      progressContainer.className = "progress-system error";
-      updateProgress(100, "Error!");
-      progressStatus.textContent = translateError(lastError);
-    } else if (hasResult) {
-      progressContainer.className = "progress-system success";
-      updateProgress(100, "Completed!");
-      if (statusData && statusData.last_success === 0) {
-        progressStatus.innerHTML = `扫描了 <strong class="result-count muted">${statusData.last_candidates}</strong> 个候选 IP，但没有一个测速成功。`;
-      } else {
-        progressStatus.innerHTML = `测速完成，共发现 <strong class="result-count">${statusData?.last_success || 0}</strong> 个有效 IP。`;
-      }
-    } else {
-      progressContainer.className = "progress-system";
-      updateProgress(0, "Ready");
-    }
-  }
-}
-
-function updateProgress(percent, status) {
-  const p = Math.min(Math.max(percent, 0), 100);
-  progressBarFill.style.width = `${p}%`;
-  progressPercent.textContent = `${Math.floor(p)} %`;
-  progressStatus.textContent = status;
-}
-
-function renderCountryOptions(selected) {
-  const selectedSet = new Set(selected);
-  countrySelect.innerHTML = countryOptions.map(([code, name]) => (
-    `<button type="button" class="country-chip ${selectedSet.has(code) ? "selected" : ""}" data-code="${code}" aria-pressed="${selectedSet.has(code) ? "true" : "false"}">
-      <span class="flag">${getFlagEmoji(code)}</span>
-      <span>${name}</span>
-      <span class="code">${code}</span>
-    </button>`
-  )).join("");
-}
-
-function renderProxyIPCountrySelect(current) {
-  proxyipSelectedCountry = current || "US";
-  const match = countryOptions.find(([code]) => code === proxyipSelectedCountry);
-  if (match) {
-    proxyipDropdownLabel.textContent = `${getFlagEmoji(match[0])} ${match[1]} (${match[0]})`;
-  }
-  proxyipDropdownMenu.innerHTML = countryOptions.map(([code, name]) =>
-    `<div class="proxyip-dropdown-item ${code === proxyipSelectedCountry ? "selected" : ""}" data-code="${code}">
-      <span>${getFlagEmoji(code)}</span>
-      <span>${name} (${code})</span>
-    </div>`
-  ).join("");
-}
-
-function selectedCountries() {
-  return Array.from(countrySelect.querySelectorAll(".country-chip.selected")).map(button => button.dataset.code);
-}
-
-function countryDisplay(row) {
-  if (row.country_code) {
-    const flag = getFlagEmoji(row.country_code);
-    const name = row.country_name || "";
-    // Simplified name: Chinese + (ISO)
-    return `${flag} ${name} (${row.country_code})`;
-  }
-  return "未知";
+  const result = await getJSON("/api/worker/proxyip", { method: "POST" });
+  if (result.success) showAlert("PROXYIP 已同步到 Cloudflare Worker。", "同步成功", "success");
+  await refresh();
 }
 
 async function checkEnvironment() {
-  checkBtn.disabled = true;
-  envPanel.className = "panel env-panel pending";
-  envSummary.className = "env-summary pending";
-  envSummary.innerHTML = `<span>检测中...</span>`;
+  els.checkBtn.disabled = true;
   try {
     const report = await getJSON("/api/preflight", { method: "POST" });
-    lastPreflight = report;
     renderEnvironment(report);
-    return report;
   } finally {
-    checkBtn.disabled = false;
+    els.checkBtn.disabled = false;
   }
 }
 
 function renderEnvironment(report) {
-  envPanel.className = `panel env-panel ${report.blocked ? "blocked" : "ok"}`;
-  envSummary.className = `env-summary ${report.blocked ? "blocked" : "ok"}`;
-  const summary = report.blocked
-    ? "检测到代理或异常低延迟信号，已阻止测速。"
-    : "环境检测通过，可以开始测速。";
-  envSummary.innerHTML = `<span>${escapeHTML(summary)}</span>`;
-  
-  let html = report.checks.map(check => `
+  els.envPanel.className = `panel env-panel ${report.blocked ? "blocked" : "ok"}`;
+  els.envSummary.textContent = report.blocked ? "检测未通过" : "检测通过";
+  els.envChecks.innerHTML = (report.checks || []).map(check => `
     <li class="${escapeHTML(check.severity)}">
-      <strong>${escapeHTML(check.name)} <em class="badge ${escapeHTML(check.severity)}">${severityLabel(check.severity)}</em></strong>
+      <strong>${escapeHTML(check.name)}</strong>
       <span>${escapeHTML(check.message)}</span>
     </li>
   `).join("");
-
-  if (report.sample && report.sample.length > 0) {
-    const sampleHtml = report.sample.map(s => `
-      <div style="font-size:12px; color:var(--text-secondary); margin-top:4px; display:flex; justify-content:space-between;">
-        <span>${s.ip}</span>
-        <span>${s.success ? `${s.total_ms}ms (${s.colo})` : `<span style="color:var(--danger)">失败</span>`}</span>
-      </div>
-    `).join("");
-    html += `<li style="display:block;"><strong>抽样详情</strong><div style="margin-top:8px;">${sampleHtml}</div></li>`;
-  }
-
-  envChecks.innerHTML = html;
 }
 
-function severityLabel(severity) {
-  return {
-    block: "阻止",
-    warn: "注意",
-    info: "通过"
-  }[severity] || severity;
+function fillConfigForm(cfg) {
+  for (const input of $$("[name]", els.configForm)) {
+    const name = input.name;
+    if (name === "sources") {
+      input.value = renderSources(cfg.sources || []);
+      continue;
+    }
+    const value = getPath(cfg, name);
+    if (input.type === "checkbox") input.checked = Boolean(value);
+    else if (Array.isArray(value)) input.value = value.join(",");
+    else input.value = value ?? "";
+  }
 }
 
-runBtn.addEventListener("click", () => start().catch(err => showAlert(err.message, "执行失败", "error")));
-clashBtn.addEventListener("click", () => generateClash().catch(err => showAlert(err.message, "执行失败", "error")));
-pushBtn.addEventListener("click", () => push().catch(err => showAlert(err.message, "执行失败", "error")));
-proxyPushBtn.addEventListener("click", () => pushProxyIP().catch(err => showAlert(err.message, "执行失败", "error")));
-proxyipFetchBtn.addEventListener("click", () => fetchProxyIPOnly().catch(err => showAlert(err.message, "执行失败", "error")));
-
-// ProxyIP country dropdown
-proxyipDropdownTrigger.addEventListener("click", (e) => {
-  e.stopPropagation();
-  proxyipDropdownMenu.classList.toggle("hidden");
-});
-proxyipDropdownMenu.addEventListener("click", (e) => {
-  const item = e.target.closest(".proxyip-dropdown-item");
-  if (!item) return;
-  proxyipSelectedCountry = item.dataset.code;
-  renderProxyIPCountrySelect(proxyipSelectedCountry);
-  proxyipDropdownMenu.classList.add("hidden");
-});
-document.addEventListener("click", () => {
-  proxyipDropdownMenu.classList.add("hidden");
-});
-proxyipDropdown.addEventListener("click", (e) => e.stopPropagation());
-
-checkBtn.addEventListener("click", () => checkEnvironment().catch(err => showAlert(err.message, "检测失败", "error")));
-clearCountryBtn.addEventListener("click", () => {
-  for (const button of countrySelect.querySelectorAll(".country-chip.selected")) {
-    button.classList.remove("selected");
-    button.setAttribute("aria-pressed", "false");
+function collectConfigForm() {
+  const next = JSON.parse(JSON.stringify(state.config));
+  for (const input of $$("[name]", els.configForm)) {
+    const name = input.name;
+    if (name === "sources") {
+      next.sources = parseSources(input.value);
+      continue;
+    }
+    const oldValue = getPath(next, name);
+    let value;
+    if (input.type === "checkbox") value = input.checked;
+    else if (Array.isArray(oldValue)) value = parseList(input.value, typeof oldValue[0] === "number");
+    else if (typeof oldValue === "number") value = Number(input.value || 0);
+    else value = input.value.trim();
+    setPath(next, name, value);
   }
-});
-countrySelect.addEventListener("click", event => {
-  const button = event.target.closest(".country-chip");
-  if (!button) return;
-  const selected = !button.classList.contains("selected");
-  button.classList.toggle("selected", selected);
-  button.setAttribute("aria-pressed", selected ? "true" : "false");
-});
-modeToggle.addEventListener("click", event => {
-  const button = event.target.closest(".mode-option");
-  if (!button) return;
-  for (const item of modeToggle.querySelectorAll(".mode-option")) item.classList.remove("selected");
-  button.classList.add("selected");
-});
+  return next;
+}
 
-loadConfig().catch(err => showAlert(err.message, "加载配置失败", "error"));
-refresh().catch(err => showAlert(err.message, "获取状态失败", "error"));
-checkEnvironment().catch(() => {
-  envPanel.className = "panel env-panel blocked";
-  envSummary.className = "env-summary blocked";
-  envSummary.innerHTML = `<span>环境检测失败，请检查网络或配置。</span>`;
-});
-setInterval(() => refresh().catch(() => {}), 2500);
+async function saveConfig() {
+  const next = collectConfigForm();
+  await getJSON("/api/config/update", {
+    method: "POST",
+    body: JSON.stringify({ config: next })
+  });
+  showAlert("配置已保存到 config.yaml。", "保存成功", "success");
+  await loadConfig();
+}
+
+function getPath(obj, path) {
+  return path.split(".").reduce((cur, part) => (cur ? cur[part] : undefined), obj);
+}
+
+function setPath(obj, path, value) {
+  const parts = path.split(".");
+  let cur = obj;
+  while (parts.length > 1) {
+    const part = parts.shift();
+    cur[part] ||= {};
+    cur = cur[part];
+  }
+  cur[parts[0]] = value;
+}
+
+function parseList(value, numeric) {
+  return String(value || "").split(",").map(item => item.trim()).filter(Boolean).map(item => numeric ? Number(item) : item);
+}
+
+function renderSources(sources) {
+  return (sources || []).map(source => [
+    "- type: " + (source.type || "file"),
+    "  name: " + (source.name || ""),
+    "  url: " + (source.url || ""),
+    "  path: " + (source.path || ""),
+    "  weight: " + (source.weight || 0)
+  ].join("\n")).join("\n");
+}
+
+function parseSources(text) {
+  const sources = [];
+  let current = null;
+  for (const raw of String(text || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("- ")) {
+      if (current) sources.push(current);
+      current = {};
+      const rest = line.slice(2);
+      if (rest.includes(":")) assignSource(current, rest);
+      continue;
+    }
+    if (current && line.includes(":")) assignSource(current, line);
+  }
+  if (current) sources.push(current);
+  return sources;
+}
+
+function assignSource(source, line) {
+  const index = line.indexOf(":");
+  const key = line.slice(0, index).trim();
+  let value = line.slice(index + 1).trim().replace(/^["']|["']$/g, "");
+  source[key] = key === "weight" ? Number(value || 0) : value;
+}
+
+function initEvents() {
+  $$(".nav-item").forEach(button => button.addEventListener("click", () => switchView(button.dataset.view)));
+  els.modalOkBtn.addEventListener("click", () => els.modalOverlay.classList.add("hidden"));
+  els.runBtn.addEventListener("click", () => startProbe().catch(err => showAlert(err.message, "执行失败", "error")));
+  els.pushBtn.addEventListener("click", () => pushADD().catch(err => showAlert(err.message, "同步失败", "error")));
+  els.copyAddBtn.addEventListener("click", () => copyText(els.addText.value, "ADD.txt"));
+  els.proxyipFetchBtn.addEventListener("click", () => fetchProxyIP().catch(err => showAlert(err.message, "执行失败", "error")));
+  els.proxyPushBtn.addEventListener("click", () => pushProxyIP().catch(err => showAlert(err.message, "同步失败", "error")));
+  els.copyProxyBtn.addEventListener("click", () => copyText(els.proxyText.value, "PROXYIP"));
+  els.saveConfigBtn.addEventListener("click", event => {
+    event.preventDefault();
+    saveConfig().catch(err => showAlert(err.message, "保存失败", "error"));
+  });
+  els.checkBtn.addEventListener("click", () => checkEnvironment().catch(err => showAlert(err.message, "检测失败", "error")));
+  els.clearCountryBtn.addEventListener("click", () => {
+    $$("#countrySelect .country-chip.selected").forEach(button => {
+      button.classList.remove("selected");
+      button.setAttribute("aria-pressed", "false");
+    });
+  });
+  els.countrySelect.addEventListener("click", event => {
+    const button = event.target.closest(".country-chip");
+    if (!button) return;
+    const selected = !button.classList.contains("selected");
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+  els.modeToggle.addEventListener("click", event => {
+    const button = event.target.closest(".segment");
+    if (!button) return;
+    $$("#modeToggle .segment").forEach(item => item.classList.remove("selected"));
+    button.classList.add("selected");
+  });
+}
+
+async function boot() {
+  initEvents();
+  await loadConfig();
+  await refresh();
+  updateActions();
+  if (window.lucide) lucide.createIcons();
+  setInterval(() => refresh().catch(() => {}), 2500);
+}
+
+boot().catch(err => showAlert(err.message, "加载失败", "error"));

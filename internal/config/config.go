@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -94,29 +95,7 @@ type AutoProxyIPVerifyConfig struct {
 }
 
 type ClashConfig struct {
-	LocalProfileDir string            `yaml:"local_profile_dir" json:"local_profile_dir"`
-	Filename        string            `yaml:"filename" json:"filename"`
-	AutoRegister    bool              `yaml:"auto_register" json:"auto_register"`
-	ProfileUID      string            `yaml:"profile_uid" json:"profile_uid"`
-	ProfileName     string            `yaml:"profile_name" json:"profile_name"`
-	Subscription    string            `yaml:"subscription_name" json:"subscription_name"`
-	Host            string            `yaml:"host" json:"host"`
-	UUID            string            `yaml:"uuid" json:"uuid"`
-	Path            string            `yaml:"path" json:"path"`
-	NodeType        string            `yaml:"node_type" json:"node_type"`
-	Network         string            `yaml:"network" json:"network"`
-	Fingerprint     string            `yaml:"fingerprint" json:"fingerprint"`
-	TestURL         string            `yaml:"test_url" json:"test_url"`
-	Interval        int               `yaml:"interval" json:"interval"`
-	Tolerance       int               `yaml:"tolerance" json:"tolerance"`
-	ProxyIP         string            `yaml:"proxyip" json:"proxyip"`
-	AutoProxyIP     AutoProxyIPConfig `yaml:"proxyip_auto" json:"proxyip_auto"`
-	EarlyData       int               `yaml:"early_data" json:"early_data"`
-	RandomPath      bool              `yaml:"random_path" json:"random_path"`
-	ECH             bool              `yaml:"ech" json:"ech"`
-	ECHSNI          string            `yaml:"ech_sni" json:"ech_sni"`
-	SkipCertVerify  bool              `yaml:"skip_cert_verify" json:"skip_cert_verify"`
-	RulesFile       string            `yaml:"rules_file" json:"rules_file"`
+	AutoProxyIP AutoProxyIPConfig `yaml:"proxyip_auto" json:"proxyip_auto"`
 }
 
 func Load(path string) (Config, error) {
@@ -129,6 +108,7 @@ func Load(path string) (Config, error) {
 		return Config{}, err
 	}
 	cfg.ApplyDefaults()
+	cfg.ResolvePaths(resolveBaseDir(path))
 	return cfg, cfg.Validate()
 }
 
@@ -195,42 +175,6 @@ func (c *Config) ApplyDefaults() {
 	if c.Output.RemarkPrefix == "" {
 		c.Output.RemarkPrefix = "IP 官方优选"
 	}
-	if c.Clash.Filename == "" {
-		c.Clash.Filename = "bestsub-local.yaml"
-	}
-	if c.Clash.ProfileUID == "" {
-		c.Clash.ProfileUID = "bestsub-local"
-	}
-	if c.Clash.ProfileName == "" {
-		c.Clash.ProfileName = "BestSub 本地优选"
-	}
-	if c.Clash.Subscription == "" {
-		c.Clash.Subscription = "edgetunnel"
-	}
-	if c.Clash.Host == "" {
-		c.Clash.Host = c.Probe.Target.Host
-	}
-	if c.Clash.Path == "" {
-		c.Clash.Path = "/"
-	}
-	if c.Clash.NodeType == "" {
-		c.Clash.NodeType = "vless"
-	}
-	if c.Clash.Network == "" {
-		c.Clash.Network = "ws"
-	}
-	if c.Clash.Fingerprint == "" {
-		c.Clash.Fingerprint = "chrome"
-	}
-	if c.Clash.TestURL == "" {
-		c.Clash.TestURL = "http://www.gstatic.com/generate_204"
-	}
-	if c.Clash.Interval <= 0 {
-		c.Clash.Interval = 300
-	}
-	if c.Clash.Tolerance <= 0 {
-		c.Clash.Tolerance = 50
-	}
 	if c.Clash.AutoProxyIP.Limit <= 0 {
 		c.Clash.AutoProxyIP.Limit = 8
 	}
@@ -255,9 +199,34 @@ func (c *Config) ApplyDefaults() {
 	if c.Clash.AutoProxyIP.WorkerVerify.MaxChecks <= 0 {
 		c.Clash.AutoProxyIP.WorkerVerify.MaxChecks = c.Clash.AutoProxyIP.Limit * 3
 	}
-	if c.Clash.ECHSNI == "" {
-		c.Clash.ECHSNI = "cloudflare-ech.com"
+}
+
+func (c *Config) ResolvePaths(baseDir string) {
+	if baseDir == "" {
+		return
 	}
+	if c.Output.Path != "" && !filepath.IsAbs(c.Output.Path) {
+		c.Output.Path = filepath.Join(baseDir, c.Output.Path)
+	}
+	if c.Probe.GeoIPDBPath != "" && !filepath.IsAbs(c.Probe.GeoIPDBPath) {
+		c.Probe.GeoIPDBPath = filepath.Join(baseDir, c.Probe.GeoIPDBPath)
+	}
+	if c.Clash.AutoProxyIP.GeoIPDBPath != "" && !filepath.IsAbs(c.Clash.AutoProxyIP.GeoIPDBPath) {
+		c.Clash.AutoProxyIP.GeoIPDBPath = filepath.Join(baseDir, c.Clash.AutoProxyIP.GeoIPDBPath)
+	}
+	for i := range c.Sources {
+		if c.Sources[i].Path != "" && !filepath.IsAbs(c.Sources[i].Path) {
+			c.Sources[i].Path = filepath.Join(baseDir, c.Sources[i].Path)
+		}
+	}
+}
+
+func resolveBaseDir(configPath string) string {
+	configDir := filepath.Dir(configPath)
+	if filepath.Base(configDir) == "configs" {
+		return filepath.Dir(configDir)
+	}
+	return configDir
 }
 
 func (c Config) Validate() error {

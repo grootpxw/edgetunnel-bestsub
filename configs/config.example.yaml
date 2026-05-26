@@ -168,72 +168,10 @@ output:
     dry_run: false
 
 # ----------------------------------------------------------
-# clash: Clash 配置生成相关设置
-# 用于将优选结果自动生成 Clash Verge Rev 可用的本地配置文件
+# clash.proxyip_auto: 反代 IP 优选配置
+# 保留 clash 这一层是为了兼容旧配置，工具已移除本地 Clash 配置生成功能
 # ----------------------------------------------------------
 clash:
-    # Clash Verge Rev 的 profiles 目录路径
-    # 留空时前端"生成本地 Clash 配置"按钮会禁用
-    # ⚠️ 注意：YAML 双引号中反斜杠 \ 会被当作转义符（如 \U 会报错 "did not find expected hexdecimal number"）
-    #    请使用正斜杠 / 代替，Go 在 Windows 上两种斜杠都能识别。
-    # Windows 示例: "C:/Users/你的用户名/AppData/Roaming/io.github.clash-verge-rev.clash-verge-rev/"
-    local_profile_dir: ""
-    # 写入 profiles 目录的文件名
-    # 默认值: "bestsub-local.yaml"
-    filename: "bestsub-local.yaml"
-    # 生成后是否自动把该 YAML 注册到 Clash Verge 的 profiles.yaml
-    # 注意：只注册不会自动切换为当前使用的配置（不修改 current）
-    auto_register: true
-    # 注册到 Clash Verge 时使用的 profile UID（唯一标识）
-    # 默认值: "bestsub-local"
-    profile_uid: "bestsub-local"
-    # 注册到 Clash Verge 时显示的配置名称
-    # 默认值: "BestSub 本地优选"
-    profile_name: "BestSub 本地优选"
-    # 订阅名称，仅用于标识和日志输出
-    # 默认值: "edgetunnel"
-    subscription_name: "edgetunnel"
-
-    # --- 节点连接参数 ---
-    # 节点连接使用的域名（通常与 Worker 域名一致）
-    # 留空时自动使用 probe.target.host 的值
-    host: "your-worker.workers.dev"
-    # VLESS 节点的 UUID
-    uuid: "your_uuid"
-    # WebSocket 路径
-    # 默认值: "/"
-    path: "/"
-    # 节点协议类型
-    # 默认值: "vless"
-    node_type: "vless"
-    # 传输层协议
-    # 默认值: "ws"
-    network: "ws"
-    # TLS 客户端指纹模拟
-    # 默认值: "chrome"
-    fingerprint: "chrome"
-
-    # --- 代理组健康检查参数 ---
-    # Clash fallback 分组健康检查使用的 URL
-    # gstatic generate_204 对 Clash 健康检查更稳定
-    # 默认值: "http://www.gstatic.com/generate_204"
-    test_url: "http://www.gstatic.com/generate_204"
-    # 健康检查间隔，单位秒
-    # 默认值: 300
-    interval: 300
-    # 兼容保留项：fallback 分组不会使用该容差值
-    # 默认值: 50
-    tolerance: 50
-    # 外部规则文件；默认仅直连本机/局域网/保留地址，其它全部落到 "♻️ 自动选择"
-    # 留空则使用内置基础规则
-    rules_file: "configs/rules.txt"
-
-    # --- ProxyIP 配置 ---
-    # 手动强制写入本地 Clash WS path 的反代 IP（proxyip）
-    # 日常使用 /admin/PROXYIP.txt 推送 Worker 动态反代时建议留空
-    # 填写后会附加 /proxyip=xxx，并覆盖 Worker KV 中的 PROXYIP.txt
-    proxyip: ""
-    
     # proxyip_auto: 单独优选反代 IP
     # 从公共列表拉取指定国家的反代 IP，经过 Worker 实测后选出可用结果
     proxyip_auto:
@@ -242,8 +180,7 @@ clash:
         # 目标国家代码（ISO 3166-1 alpha-2，单选）
         # 例如: "JP"（日本）, "US"（美国）, "HK"（香港）, "SG"（新加坡）
         country: "JP"
-        # 最多保留几个可用的反代 IP 拼接到 Clash 配置中
-        # 每个反代 IP 会生成一组独立的节点
+        # 最多保留几个可用的反代 IP
         # 默认值: 8
         limit: 8
         # GeoIP 过滤后最多随机抽取多少个候选交给 Worker 实测
@@ -278,27 +215,3 @@ clash:
             # 旧版最多检查多少个测速结果；新逻辑请使用 proxyip_auto.max_candidates
             # 默认值: limit * 3
             max_checks: 24
-
-    # --- 高级连接参数 ---
-    # WebSocket 0-RTT Early Data 大小，单位字节
-    # 用于减少握手延迟，0 表示禁用
-    # 推荐值: 2560
-    early_data: 2560
-    # 是否为每个节点生成随机化的 WS path 前缀
-    # 开启后可降低被识别和封锁的概率
-    random_path: true
-    # 是否启用 ECH（Encrypted Client Hello）
-    # ECH 可以加密 TLS 握手中的 SNI，提高隐私性
-    ech: true
-    # ECH 查询使用的 SNI 域名
-    # 默认值: "cloudflare-ech.com"
-    ech_sni: "cloudflare-ech.com"
-    # 是否跳过 TLS 证书验证
-    # 生产环境建议保持 false
-    skip_cert_verify: false
-
-    # 外部规则文件路径（相对路径或绝对路径）
-    # 留空则使用内置的基础规则
-    # 规则文件中引用的代理组如果不在生成的分组中，会自动替换为 ♻️ 自动选择
-    # 格式：每行一条规则，如 DOMAIN-SUFFIX,google.com,🚀 节点选择
-    rules_file: "configs/rules.txt"

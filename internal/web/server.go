@@ -7,20 +7,15 @@ import (
 	"encoding/json"
 	"log"
 	"mime"
-	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/grootpxw/edgetunnel-bestsub/internal/app"
-	"github.com/grootpxw/edgetunnel-bestsub/internal/clash"
 	"github.com/grootpxw/edgetunnel-bestsub/internal/config"
 	"github.com/grootpxw/edgetunnel-bestsub/internal/preflight"
 	"github.com/grootpxw/edgetunnel-bestsub/internal/probe"
@@ -177,8 +172,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/proxyip/fetch", s.handleProxyIPFetch)
 	mux.HandleFunc("/api/worker/push", s.handlePush)
 	mux.HandleFunc("/api/worker/proxyip", s.handleProxyIPPush)
-	mux.HandleFunc("/api/clash/generate", s.handleClashGenerate)
-	mux.HandleFunc("/api/clash/local.yaml", s.handleClashYAML)
 	mux.HandleFunc("/", s.handleIndex)
 
 	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
@@ -436,104 +429,6 @@ func (s *Server) handleProxyIPPush(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleClashGenerate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	s.mu.Lock()
-	if s.running {
-		s.mu.Unlock()
-		http.Error(w, "probe is currently running", http.StatusConflict)
-		return
-	}
-	if s.last == nil || len(s.last.Top) == 0 {
-		s.mu.Unlock()
-		http.Error(w, "没有可用测速结果，请先完成测速", http.StatusBadRequest)
-		return
-	}
-	cfg := s.cfg
-	top := append([]probe.Result(nil), s.last.Top...)
-	s.mu.Unlock()
-
-	result, err := clash.GenerateToLocalProfile(cfg, top)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	registered := false
-	if cfg.Clash.AutoRegister {
-		if err := openClashImportURL(s.clashImportURL()); err != nil {
-			http.Error(w, "生成成功，但调用 Clash 导入失败: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		registered = true
-	}
-	writeJSON(w, map[string]any{
-		"success":    true,
-		"path":       result.Path,
-		"nodes":      result.Nodes,
-		"registered": registered,
-	})
-}
-
-func (s *Server) handleClashYAML(w http.ResponseWriter, r *http.Request) {
-	s.mu.Lock()
-	if s.last == nil || len(s.last.Top) == 0 {
-		s.mu.Unlock()
-		http.Error(w, "没有可用测速结果，请先完成测速", http.StatusBadRequest)
-		return
-	}
-	cfg := s.cfg
-	top := append([]probe.Result(nil), s.last.Top...)
-	s.mu.Unlock()
-
-	body, err := clash.Build(cfg, top)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	filename := strings.TrimSpace(cfg.Clash.Filename)
-	if filename == "" {
-		filename = "bestsub-local.yaml"
-	}
-	displayName := strings.TrimSpace(cfg.Clash.ProfileName)
-	if displayName == "" {
-		displayName = filename
-	}
-	if !strings.HasSuffix(strings.ToLower(displayName), ".yaml") && !strings.HasSuffix(strings.ToLower(displayName), ".yml") {
-		displayName += ".yaml"
-	}
-	w.Header().Set("Content-Type", "application/x-yaml; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"; filename*=UTF-8''`+url.PathEscape(displayName))
-	w.Header().Set("Profile-Update-Interval", "24")
-	w.Header().Set("Profile-Web-Page-Url", "http://"+s.localHTTPAddr()+"/")
-	_, _ = w.Write([]byte(body))
-}
-
-func (s *Server) clashImportURL() string {
-	return "http://" + s.localHTTPAddr() + "/api/clash/local.yaml"
-}
-
-func (s *Server) localHTTPAddr() string {
-	host, port, err := net.SplitHostPort(s.cfg.Server.Listen)
-	if err != nil {
-		return s.cfg.Server.Listen
-	}
-	if host == "" || host == "0.0.0.0" || host == "::" || host == "[::]" {
-		host = "127.0.0.1"
-	}
-	return net.JoinHostPort(host, port)
-}
-
-func openClashImportURL(profileURL string) error {
-	if runtime.GOOS != "windows" {
-		return nil
-	}
-	importURL := "clash://install-config?url=" + url.QueryEscape(profileURL)
-	return exec.Command("rundll32", "url.dll,FileProtocolHandler", importURL).Start()
-}
-
 func parseCountries(raw string) []string {
 	if raw == "" {
 		return nil
@@ -558,7 +453,8 @@ func (s *Server) handlePreflight(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Countries []string `json:"countries"`
+		Countries []string       `json:"countries"`
+		Config    *config.Config `json:"config"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -568,7 +464,17 @@ func (s *Server) handleConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.cfg.Probe.Countries = req.Countries
+	if req.Config != nil {
+		next := *req.Config
+		next.ApplyDefaults()
+		if err := next.Validate(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.cfg = next
+	} else {
+		s.cfg.Probe.Countries = req.Countries
+	}
 	if err := s.cfg.Save(s.configPath); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
