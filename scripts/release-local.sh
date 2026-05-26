@@ -74,6 +74,7 @@ build_windows() {
 case "$GOOS_NAME/$GOARCH_NAME" in
   darwin/arm64|darwin/amd64)
     build_macos "BestSub-darwin-arm64.zip" "darwin/arm64"
+    build_macos "BestSub-darwin-amd64.zip" "darwin/amd64"
     build_windows
     ;;
   windows/amd64)

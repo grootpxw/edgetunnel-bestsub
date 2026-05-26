@@ -124,6 +124,7 @@ wails dev
 构建完成后会生成：
 
 - `release/BestSub-darwin-arm64.zip`
+- `release/BestSub-darwin-amd64.zip`
 - `release/BestSub-windows-amd64.zip`
 
 如果本机已经安装 GitHub CLI，也可以直接上传：
@@ -135,7 +136,7 @@ wails dev
 说明：
 
 - 当前项目基于 Wails `v2.12.0`
-- 在 macOS 上，本地脚本按 `wails build -platform ...` 依次构建 macOS 与 Windows 包
+- 在 macOS 上，本地脚本按 `wails build -platform ...` 依次构建 Apple Silicon、Intel Mac 与 Windows 包
 - Windows 包默认带 `-webview2 download`，首次运行缺少 WebView2 时可引导安装
 
 如果你只想在 Windows 本机单独构建 Windows 包，也可以：
