@@ -111,20 +111,63 @@ wails dev
 
 ## 发布
 
-仓库已内置 GitHub Actions 自动发布：
+当前仓库保留了 GitHub Actions 自动发布配置，但如果 GitHub 账户因 billing 导致 Actions 不可用，推荐直接走本地发版。
 
-- 触发条件：推送 tag，格式如 `v0.1.0`
-- 构建产物：
-  - `BestSub-darwin-arm64.zip`
-  - `BestSub-windows-amd64.zip`
-- 发布位置：GitHub Releases
+### 方式一：本地构建并手动上传 Release
 
-发布步骤：
+推荐直接在 macOS 上执行，一次生成：
+
+```bash
+./scripts/release-local.sh v1.0.1
+```
+
+构建完成后会生成：
+
+- `release/BestSub-darwin-arm64.zip`
+- `release/BestSub-windows-amd64.zip`
+
+如果本机已经安装 GitHub CLI，也可以直接上传：
+
+```bash
+./scripts/release-local.sh v1.0.1 --upload
+```
+
+说明：
+
+- 当前项目基于 Wails `v2.12.0`
+- 在 macOS 上，本地脚本按 `wails build -platform ...` 依次构建 macOS 与 Windows 包
+- Windows 包默认带 `-webview2 download`，首次运行缺少 WebView2 时可引导安装
+
+如果你只想在 Windows 本机单独构建 Windows 包，也可以：
+
+```powershell
+.\scripts\release-local.ps1 v1.0.1
+```
+
+构建完成后会生成：
+
+- `release/BestSub-windows-amd64.zip`
+
+如已安装 GitHub CLI，可直接上传：
+
+```powershell
+.\scripts\release-local.ps1 v1.0.1 --upload
+```
+
+说明：
+
+- 推荐在 macOS 本机上统一构建 macOS + Windows 两个包
+- Windows 本机脚本主要用于单独补 Windows 包
+- 若不使用 `--upload`，也可以去 GitHub Release 页面手动上传 zip 资产
+
+### 方式二：GitHub Actions 自动发布
+
+触发方式：
 
 ```bash
 git push origin main
-git tag v0.1.0
-git push origin v0.1.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 对应工作流：
