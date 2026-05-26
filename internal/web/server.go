@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -467,6 +468,7 @@ func (s *Server) handleConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.Config != nil {
 		next := *req.Config
 		next.ApplyDefaults()
+		next.ResolvePaths(filepath.Dir(s.configPath))
 		if err := next.Validate(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

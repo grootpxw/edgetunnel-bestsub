@@ -36,6 +36,7 @@ BestSub 是一个面向 EdgeTunnel / Cloudflare Worker 的桌面优选工具。
 同时会自动生成：
 
 - `seeds.txt`
+- `GeoLite2-Country.mmdb`
 - 后续运行产生的 `ADD.txt`
 - 后续运行产生的 `PROXYIP.txt`
 
@@ -178,6 +179,6 @@ git push origin v1.0.1
 ## 注意事项
 
 - Windows 机器需要可用的 WebView2 Runtime。
-- `GeoLite2-Country.mmdb` 属于本地可选依赖，不建议提交到仓库。
+- 程序已内置 `GeoLite2-Country.mmdb`，启动时会自动释放到用户配置目录，开启 GeoIP 匹配时无需手动下载。
 - 远程候选源依赖外网访问，网络受限时建议补充本地 `seeds.txt`。
 - `worker.password` 只应保存在本机配置中，不要提交到 GitHub。

@@ -20,6 +20,7 @@ import (
 
 	"github.com/grootpxw/edgetunnel-bestsub/internal/app"
 	"github.com/grootpxw/edgetunnel-bestsub/internal/config"
+	"github.com/grootpxw/edgetunnel-bestsub/internal/geoipdata"
 	"github.com/grootpxw/edgetunnel-bestsub/internal/web"
 )
 
@@ -124,6 +125,9 @@ func Main() {
 		waitBeforeExit()
 		os.Exit(1)
 	}
+	if err := ensureBundledGeoIPDB(resolvedConfigPath); err != nil {
+		log.Printf("释放内置 GeoIP 数据库失败: %v", err)
+	}
 
 	if *run {
 		if err := runOnce(cfg, *push, *jsonOut); err != nil {
@@ -138,6 +142,14 @@ func Main() {
 	}
 
 	startDesktopTool(resolvedConfigPath, cfg)
+}
+
+func ensureBundledGeoIPDB(configPath string) error {
+	path, err := geoipdata.EnsureCountryDB(filepath.Dir(configPath))
+	if err == nil {
+		log.Printf("[startup] GeoIP 数据库就绪: %s", path)
+	}
+	return err
 }
 
 func resolveConfigPath(path string) (string, error) {
