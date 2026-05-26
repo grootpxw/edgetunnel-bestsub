@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $Version = if ($args.Length -ge 1) { $args[0] } else { "" }
 $Upload = $args -contains "--upload"
+$Repo = $env:REPO
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
     Write-Host "用法: .\scripts\release-local.ps1 <tag> [--upload]"
@@ -13,6 +14,23 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 $RootDir = Resolve-Path (Join-Path $PSScriptRoot "..")
 $ReleaseDir = Join-Path $RootDir "release"
 New-Item -ItemType Directory -Force -Path $ReleaseDir | Out-Null
+
+if ([string]::IsNullOrWhiteSpace($Repo)) {
+    $OriginUrl = ""
+    try {
+        $OriginUrl = (git -C $RootDir remote get-url origin).Trim()
+    } catch {
+        $OriginUrl = ""
+    }
+    if ($OriginUrl -match 'github\.com[:/](.+?)(?:\.git)?$') {
+        $Repo = $Matches[1]
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($Repo)) {
+    Write-Host "无法从 origin 自动识别 GitHub 仓库，请手动设置 REPO=owner/name 后重试。"
+    exit 1
+}
 
 if (-not (Get-Command wails -ErrorAction SilentlyContinue)) {
     Write-Host "未检测到 wails，请先安装："
@@ -58,13 +76,15 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-gh release view $Version *> $null
+Write-Host "上传目标仓库: $Repo"
+
+gh release view $Version --repo $Repo *> $null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Release $Version 不存在，正在创建..."
-    gh release create $Version $AssetPath --title "BestSub $Version" --generate-notes
+    gh release create $Version $AssetPath --repo $Repo --title "BestSub $Version" --generate-notes
 } else {
     Write-Host "Release $Version 已存在，正在上传/覆盖资产..."
-    gh release upload $Version $AssetPath --clobber
+    gh release upload $Version $AssetPath --repo $Repo --clobber
 }
 
 Write-Host "上传完成: $Version -> $AssetName"

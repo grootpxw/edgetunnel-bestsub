@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RELEASE_DIR="$ROOT_DIR/release"
 VERSION="${1:-}"
 UPLOAD_FLAG="${2:-}"
+REPO="${REPO:-}"
 ASSETS=()
 
 if [[ -z "$VERSION" ]]; then
@@ -24,6 +25,20 @@ mkdir -p "$RELEASE_DIR"
 
 GOOS_NAME="$(go env GOOS)"
 GOARCH_NAME="$(go env GOARCH)"
+
+resolve_repo() {
+  if [[ -n "$REPO" ]]; then
+    return 0
+  fi
+  local remote_url=""
+  remote_url="$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || true)"
+  if [[ "$remote_url" =~ github\.com[:/]([^/]+/[^/.]+)(\.git)?$ ]]; then
+    REPO="${BASH_REMATCH[1]}"
+    return 0
+  fi
+  echo "无法从 origin 自动识别 GitHub 仓库，请手动设置 REPO=owner/name 后重试。"
+  exit 1
+}
 
 build_macos() {
   local asset_name="$1"
@@ -87,12 +102,15 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! gh release view "$VERSION" >/dev/null 2>&1; then
+resolve_repo
+echo "上传目标仓库：$REPO"
+
+if ! gh release view "$VERSION" --repo "$REPO" >/dev/null 2>&1; then
   echo "Release $VERSION 不存在，正在创建..."
-  gh release create "$VERSION" "${ASSETS[@]}" --title "BestSub $VERSION" --generate-notes
+  gh release create "$VERSION" "${ASSETS[@]}" --repo "$REPO" --title "BestSub $VERSION" --generate-notes
 else
   echo "Release $VERSION 已存在，正在上传/覆盖资产..."
-  gh release upload "$VERSION" "${ASSETS[@]}" --clobber
+  gh release upload "$VERSION" "${ASSETS[@]}" --repo "$REPO" --clobber
 fi
 
 echo "上传完成：$VERSION"
